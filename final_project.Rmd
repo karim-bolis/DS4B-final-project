@@ -1,29 +1,137 @@
 ---
-title: "final_project"
-output: html_document
-date: "2023-10-14"
+title: "Final Project"
+author: "Karim Bolis u6671566"
+date: "14/10/23"
+output:
+    html_document:
+        toc: true
+        toc_depth: 4
+        theme: cosmo
+        number_sections: false
+        toc_float: true
+        highlight: pygments
+        fig_width: 8
+        fig_height: 4
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Location on GitHub
+https://github.com/karim-bolis/DS4B-short-report-1/blob/bb8cedde0e7076b351e5d1469935c611a0e7a38a/frog_species.Rmd
+
+# red list idea
+```{r}
+library(tidyverse)
+remotes::install_github("traitecoevo/austraits")
+
+#remotes::install_github("guillembagaria/ggbiome")
+
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library(austraits)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r}
+austraits = load_austraits(version="4.1.0")
 
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+austraits_species_list <- unique(austraits$traits$taxon_name)
+austraits_species_list = trimws(austraits_species_list)
+
+red_list_species = read_csv("data/redlist_species_data_37eb453b-68b3-42c2-8a5a-33fee5fffdbc/assessments.csv")
+
+typeof(red_list_species$scientificName)
+
+common_elements = austraits_species_list %in% red_list_species
+
+if (any(common_elements)) {
+  cat("The vectors have common elements:", vector1[common_elements], "\n")
+} else {
+  cat("No common elements found.\n")
+}
+
+
+```
+
+
+Notes:
+first I loaded the excel sheet containing the different AvoNets, then I compared the column names between them to see if there's data in one that is missing in the others
+
+```{r}
+library(readxl)
+library(janitor)
+raw_birdlife = read_excel("data/AVONET Supplementary dataset 1.xlsx", sheet=2)
+raw_ebird = read_excel("data/AVONET Supplementary dataset 1.xlsx", sheet=3)
+raw_birdtree = read_excel("data/AVONET Supplementary dataset 1.xlsx", sheet=4)
+
+avonet_birdlife = as_tibble(raw_birdlife)
+avonet_ebird = as_tibble(raw_ebird)
+avonet_birdtree = as_tibble(raw_birdtree)
+
+# get no. of columns
+print(length(colnames(avonet_birdlife)))
+print(length(colnames(avonet_ebird)))
+print(length(colnames(avonet_birdtree)))
+
+compare_df_cols(avonet_birdlife,avonet_ebird, avonet_birdtree)
+
+
+
+
+```
+
+trialling finding the avg temperature from a lat/long
+
+```{r}
+library(raster)
+library(sp)
+
+
+# r <- getData("worldclim",var="bio",res=2.5)
+# r <- r[[1]]
+# names(r) <- "Temp"
+# 
+# plot(r)
+
+setwd("data/wc2.1_30s_tavg")
+
+months <- c("wc2.1_30s_tavg_01.tif", "wc2.1_30s_tavg_02.tif", "wc2.1_30s_tavg_03.tif", "wc2.1_30s_tavg_04.tif", "wc2.1_30s_tavg_05.tif", "wc2.1_30s_tavg_06.tif", "wc2.1_30s_tavg_07.tif", "wc2.1_30s_tavg_08.tif", "wc2.1_30s_tavg_09.tif", "wc2.1_30s_tavg_10.tif", "wc2.1_30s_tavg_11.tif", "wc2.1_30s_tavg_12.tif")
+
+months_raster = lapply(months,raster)
+
+get_mean_annual_temp <- function(raster_list, lat, long) {
+  points = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = raster_list[[1]]@crs)
+
+  # Initialize an empty list to store extracted values
+  extracted_values <- numeric(length(raster_list))
+
+  # Loop through each raster in the list
+  for (i in 1:length(raster_list)) {
+    
+    # Extract temperature value at the specified lat/long location
+    extracted_value = extract(raster_list[[i]], points)
+    
+    # Append extracted value to the list
+    extracted_values[i] = extracted_value
+  }
+
+  
+  # Return the list of extracted values (one value for each raster)
+  return(mean(extracted_values))
+}
+
+mean_annual_temp = get_mean_annual_temp(months_raster,66,96)
+
+
+
+```
+
+
+
+
+
+# References
+
+for the compare_df_cols function in the janitor package: https://stackoverflow.com/questions/53264993/comparing-column-names-in-r-across-various-data-frames
