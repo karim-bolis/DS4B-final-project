@@ -268,7 +268,7 @@ avonet = filter(avonet, !is.na(Centroid.Latitude) & !is.na(Centroid.Longitude))
 
 ```
 
-trialling finding the avg temperature from a lat/long
+Finding the mean annual temperature from a lat/long
 
 ```{r}
 library(raster)
@@ -336,29 +336,54 @@ FIRST START BY DIVIDING INTO FAMILIES, READ UP ON THIS.
 
 checking the relationship between wing length and secondary length. We hypothesise it would be linear, and that the distributions do not contain too many outliers.
 boxplots to find if pearson's coefficient is the more useful one, to check outliers basically.
-```{r}
 
-# Create side-by-side box plots
-ggplot(avonet, aes(x = "", y = Wing.Length)) +
-  geom_boxplot(fill = "blue") +
-  labs(y = "Wing Length") +
-  theme_minimal() +
-  theme(axis.title.x = element_blank())
-
-
-```
-
-
-
-
-
-trying to do PCA
+boxplot showed many outliers, so spearman may be better since pearson is affected by outliers, but clear linear correlation with extremely small confidence interval shows pearson may be better. Correlation coefficients show pearson is slightly better, but both are high
 
 So the aim here is to have a single, composite metric that captures the variation in the metrics of wing length and secondary length. We know the two measurements are highly correlated, so in theory the first principal component should capture a large amount of the data
 ```{r}
 library(psych)
 
-avonet
+summary(avonet$Wing.Length)
+summary(avonet$Secondary1)
+
+# Create side-by-side box plots
+ggplot(avonet, aes(x = 1, y = Wing.Length)) +
+  geom_boxplot(width = 0.2, fill = "blue") +
+  labs(y = "Value") +
+  labs(x = "Distributions") +
+  geom_boxplot(data = avonet, aes(x = 2, y = Secondary1), width = 0.2, fill = "red") +
+  scale_x_continuous(breaks = c(1, 2), labels = c("Wing Length", "Secondary Length"))
+
+ggplot(avonet, aes(x = 1, y = Wing.Length)) +
+  geom_violin(fill = "blue") +
+  labs(y = "Value") +
+  theme_minimal() +
+  labs(x = "Distributions") +
+  geom_violin(data = avonet, aes(x = 2, y = Secondary1), fill = "red") +
+  theme_minimal() +
+  scale_x_continuous(breaks = c(1, 2), labels = c("Wing Length", "Secondary Length"))
+
+ggplot(avonet, aes(x = Wing.Length, y = Secondary1)) +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm', se=TRUE, level=0.99999999)
+
+correlation_value_pearson = cor(avonet$Wing.Length, avonet$Secondary1, method = "pearson")
+correlation_value_spearman = cor(avonet$Wing.Length, avonet$Secondary1, method = "spearman")
+print(correlation_value_pearson)
+print(correlation_value_spearman)
+
+# Perform PCA using the Pearson correlation matrix
+pca_model = principal(select(avonet,Wing.Length,Secondary1), nfactors = 2, rotate='none')
+summary(pca_model)
+print(pca_model)
+
+pc1 = pca_model$scores[,1]
+
+head(avonet$Wing.Length)
+head(avonet$Secondary1)
+head(pc1)
+
+
 
 ```
 
@@ -371,10 +396,19 @@ avonet
 normal correlation
 ```{r}
 
-#start with violin plot visualisation of distributions of wing length in different families to provide proof that we must study different families separately
+# start with violin plot visualisation of distributions of wing length in different families to provide proof that we must study different families separately
 
 
-# then do correlations
+
+# correlations
+
+avonet_Accipitridae = filter(avonet,Family3=="Accipitridae")
+wg_mat_acc = lm(data = avonet_Accipitridae, mean_annual_temp ~ Wing.Length)
+summary(wg_mat_acc)
+
+correlation_value_pearson = cor(,avonet$mean_annual_temp, method = "pearson")
+print(correlation_value_pearson)
+correlation_value_spearman =
 
 ```
 
