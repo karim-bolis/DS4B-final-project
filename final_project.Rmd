@@ -1,8 +1,8 @@
 ---
-title: "Final Project"
+title: "Does Allen's rule apply to ..."
 author: "Karim Bolis u6671566"
 date: "14/10/23"
-output:
+output:  
     html_document:
         toc: true
         toc_depth: 4
@@ -14,29 +14,169 @@ output:
         fig_height: 4
 ---
 
+# Word/figure count
+
+Words: [The number of words in your document, calculated using the word_count() function at the end of this document]
+Figures: [The number of figures in your document. You can just count these]
+
 # Location on GitHub
-https://github.com/karim-bolis/DS4B-short-report-1/blob/bb8cedde0e7076b351e5d1469935c611a0e7a38a/frog_species.Rmd
+
+[A URL to the root directory of your final project on GitHub]
+
+# Data Description
+
+Avonet is a database of morphological, geographical and ecological data for all birds ...
+
+[A brief (~100-200 words should be more than enough) description of the dataset, referencing any key publications that go with it]
+
+# Questions/Aims
+
+
+
+[A brief section which first states and then justifies the questions/aims of your EDA. Must provide evidence of independent research into what has been done before on these questions/aims. See above for examples.]
+
+# Raw data
+
+```{r}
+library(readxl)
+
+raw_birdlife = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=2)
+raw_ebird = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=3)
+raw_birdtree = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
+```
+
+
+
+[Explains how and where to get the exact raw data you got]
+[Is reproducible by a person (required) and a machine (ideally)]
+
+# Data wrangling
+
+[R chunks and prose which:]
+[Tidies up your raw data, outputs tidied_data.csv]
+[Cleans up your tidied data, outputs cleaned_data.csv]
+
+# Sanity checks
+
+[R chunks and prose which perform sanity checks on your cleaned data]
+[Remember that this really just summarises that your data are OK after you've cleaned them]
+[Most of the real sanity checks and data cleaning go on in the data_cleaning.Rmd file]
+
+# Addressing the questions/aims
+
+[This is the *main* section of your work. For example, if you are doing an EDA, this is where you would summarise it. If you are building something like a package or shiny app, a description of that package / app and demonstration of its function(s) would go here. Use appropriate sub-headings.]
+
+# References
+
+[References you have cited throughout your text]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # red list idea
 ```{r}
 library(tidyverse)
-remotes::install_github("traitecoevo/austraits")
+# remotes::install_github("traitecoevo/austraits")
 
 #remotes::install_github("guillembagaria/ggbiome")
 
 ```
 
+# austraits
+
 ```{r}
 library(austraits)
-```
-
-
-```{r}
 austraits = load_austraits(version="4.1.0")
 
-```
-
-```{r}
 austraits_species_list <- unique(austraits$traits$taxon_name)
 austraits_species_list = trimws(austraits_species_list)
 
@@ -52,31 +192,77 @@ if (any(common_elements)) {
   cat("No common elements found.\n")
 }
 
-
 ```
 
+
+
+
+
+
+
+As the climate gets hotter, ornithologists have found that birds tend to get smaller. This is consistent with one of ecology's oldest rules: Bergmann's rule. It states that in hotter climates, body sizes tend to shrink, as the increase in surface-area-to-volume ratio results in more heat exchange with the environment and better heat loss.
 
 Notes:
 first I loaded the excel sheet containing the different AvoNets, then I compared the column names between them to see if there's data in one that is missing in the others
 
+avonet_ebird was excluded because it has no centroid values so no way to find species locations.
+
+avonet_birdtree has species status, which is missing from avonet_birdlife for some reason, even though birdtree got its data from the birdlife database
+
 ```{r}
 library(readxl)
 library(janitor)
-raw_birdlife = read_excel("data/AVONET Supplementary dataset 1.xlsx", sheet=2)
-raw_ebird = read_excel("data/AVONET Supplementary dataset 1.xlsx", sheet=3)
-raw_birdtree = read_excel("data/AVONET Supplementary dataset 1.xlsx", sheet=4)
+raw_birdlife = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=2)
+raw_ebird = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=3)
+raw_birdtree = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
+raw_all = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=6)
 
 avonet_birdlife = as_tibble(raw_birdlife)
 avonet_ebird = as_tibble(raw_ebird)
 avonet_birdtree = as_tibble(raw_birdtree)
-
-# get no. of columns
-print(length(colnames(avonet_birdlife)))
-print(length(colnames(avonet_ebird)))
-print(length(colnames(avonet_birdtree)))
+avonet_all = as_tibble(raw_all)
 
 compare_df_cols(avonet_birdlife,avonet_ebird, avonet_birdtree)
 
+# compare number of individuals in datasets
+print(sum(avonet_birdlife$Total.individuals))
+print(sum(avonet_ebird$Total.individuals))
+print(sum(avonet_birdtree$Total.individuals))
+
+# choose birdtree as primary database and filter species with too low numbers
+avonet = filter(avonet_birdtree,Total.individuals>=3)
+
+# sanity checks
+print(nrow(filter(avonet,Female + Male + Unknown != Total.individuals)))
+print(nrow(filter(avonet,Complete.measures > Total.individuals)))
+print(filter(avonet,Mass==111000.00))
+
+avonet = avonet %>%
+  mutate(Min.Latitude=as.double(Min.Latitude)) %>%
+  mutate(Max.Latitude=as.double(Max.Latitude)) %>%
+  mutate(Centroid.Latitude=as.double(Centroid.Latitude)) %>%
+  mutate(Centroid.Longitude=as.double(Centroid.Longitude)) %>%
+  mutate(Range.Size=as.double(Range.Size))
+
+# get an overview of the data
+summary(avonet)
+
+# OTHER THINGS LIKE CHECKING SPECIES.STATUS IS EITHER "Extinct, Exant or Invalid". but honestly if you're out of time you can just say you did it in excel in the text
+
+
+# FILTER OUT ROWS THAT DON'T HAVE VALUES FOR THE TRAITS YOU WANT TO MEASURE
+
+# avonet_all_means_medians = avonet_all %>%
+#   group_by("Species3_BirdTree") %>%
+#   MEANS AND MEDIANS OF BEAKS OR OTHER APPENDAGE??
+#   rowwise() %>%
+#   mutate(ratio_VALUE1 = max(c(mean_VALLUE1, median_VALUE1)) / min(c(mean_VALUE1, median_VALUE1)) )
+
+# check for empty or missing values
+any(is.na(avonet))
+
+# exclude species with no centroids
+avonet = filter(avonet, !is.na(Centroid.Latitude) & !is.na(Centroid.Longitude))
 
 
 
@@ -89,41 +275,75 @@ library(raster)
 library(sp)
 
 
-# r <- getData("worldclim",var="bio",res=2.5)
-# r <- r[[1]]
+r <- getData("worldclim",var="bio",res=2.5)
+r <- r[[1]]
 # names(r) <- "Temp"
-# 
 # plot(r)
 
-setwd("data/wc2.1_30s_tavg")
-
-months <- c("wc2.1_30s_tavg_01.tif", "wc2.1_30s_tavg_02.tif", "wc2.1_30s_tavg_03.tif", "wc2.1_30s_tavg_04.tif", "wc2.1_30s_tavg_05.tif", "wc2.1_30s_tavg_06.tif", "wc2.1_30s_tavg_07.tif", "wc2.1_30s_tavg_08.tif", "wc2.1_30s_tavg_09.tif", "wc2.1_30s_tavg_10.tif", "wc2.1_30s_tavg_11.tif", "wc2.1_30s_tavg_12.tif")
-
-months_raster = lapply(months,raster)
-
-get_mean_annual_temp <- function(raster_list, lat, long) {
-  points = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = raster_list[[1]]@crs)
-
-  # Initialize an empty list to store extracted values
-  extracted_values <- numeric(length(raster_list))
-
-  # Loop through each raster in the list
-  for (i in 1:length(raster_list)) {
-    
-    # Extract temperature value at the specified lat/long location
-    extracted_value = extract(raster_list[[i]], points)
-    
-    # Append extracted value to the list
-    extracted_values[i] = extracted_value
-  }
-
+get_mean_annual_temp_1 <- function(climate_data, lat, long) {
+  point = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = climate_data@crs)
   
-  # Return the list of extracted values (one value for each raster)
-  return(mean(extracted_values))
+  # Extract temperature value at the specified lat/long location
+  return(raster::extract(climate_data, point))
 }
 
-mean_annual_temp = get_mean_annual_temp(months_raster,66,96)
+mean_annual_temp = get_mean_annual_temp_1(r,66,96)
+print(mean_annual_temp)
 
+
+
+
+
+
+
+# setwd("data/wc2.1_10m_tavg")
+# 
+# months <- c("wc2.1_10m_tavg_01.tif", "wc2.1_10m_tavg_02.tif", "wc2.1_10m_tavg_03.tif", "wc2.1_10m_tavg_04.tif", "wc2.1_10m_tavg_05.tif", "wc2.1_10m_tavg_06.tif", "wc2.1_10m_tavg_07.tif", "wc2.1_10m_tavg_08.tif", "wc2.1_10m_tavg_09.tif", "wc2.1_10m_tavg_10.tif", "wc2.1_10m_tavg_11.tif", "wc2.1_10m_tavg_12.tif")
+# 
+# months_raster = lapply(months,raster)
+# 
+# get_mean_annual_temp <- function(raster_list, lat, long) {
+#   points = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = raster_list[[1]]@crs)
+# 
+#   # Initialize an empty list to store extracted values
+#   extracted_values <- numeric(length(raster_list))
+# 
+#   # Loop through each raster in the list
+#   for (i in 1:length(raster_list)) {
+#     
+#     # Extract temperature value at the specified lat/long location
+#     extracted_value = raster::extract(raster_list[[i]], points)
+#     
+#     # Append extracted value to the list
+#     extracted_values[i] = extracted_value
+#   }
+#   
+#   # Return the list of extracted values (one value for each raster)
+#   return(mean(extracted_values))
+# }
+# 
+# mean_annual_temp = get_mean_annual_temp(months_raster,66,96)
+# print(mean_annual_temp)
+
+
+
+
+```
+
+
+
+FIRST START BY DIVIDING INTO FAMILIES, READ UP ON THIS.
+
+checking the relationship between wing length and secondary length. We hypothesise it would be linear, and that the distributions do not contain too many outliers.
+boxplots to find if pearson's coefficient is the more useful one, to check outliers basically.
+```{r}
+
+# Create side-by-side box plots
+ggplot(avonet, aes(x = "", y = Wing.Length)) +
+  geom_boxplot(fill = "blue") +
+  labs(y = "Wing Length") +
+  theme_minimal() +
+  theme(axis.title.x = element_blank())
 
 
 ```
@@ -132,6 +352,100 @@ mean_annual_temp = get_mean_annual_temp(months_raster,66,96)
 
 
 
+trying to do PCA
+
+So the aim here is to have a single, composite metric that captures the variation in the metrics of wing length and secondary length. We know the two measurements are highly correlated, so in theory the first principal component should capture a large amount of the data
+```{r}
+library(psych)
+
+avonet
+
+```
+
+
+
+
+
+
+
+normal correlation
+```{r}
+
+#start with violin plot visualisation of distributions of wing length in different families to provide proof that we must study different families separately
+
+
+# then do correlations
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+attempt at running a Bayesian phylogenetic generalized linear mixed model (PGLMM)
+```{r}
+library(MCMCglmm)
+
+avonet = avonet %>%
+  mutate(mean_annual_temp = get_mean_annual_temp_1(r, Centroid.Latitude, Centroid.Longitude))
+
+print(nrow(avonet))
+avonet = filter(avonet, !is.na(mean_annual_temp))
+print(nrow(avonet))
+
+
+# Fit the Bayesian PGLMM
+model <- MCMCglmm(Wing.Length ~ mean_annual_temp,
+                   random = ~Species,
+                   family = "gaussian",
+                   data = bird_data,
+                   pedigree = Phylogeny)
+
+# Summarize the model
+summary(model)
+
+
+```
+
+
+
 # References
 
 for the compare_df_cols function in the janitor package: https://stackoverflow.com/questions/53264993/comparing-column-names-in-r-across-various-data-frames
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
