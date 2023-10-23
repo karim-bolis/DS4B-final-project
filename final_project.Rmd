@@ -16,45 +16,59 @@ output:
 
 # Word/figure count
 
-Words: [The number of words in your document, calculated using the word_count() function at the end of this document]
-Figures: [The number of figures in your document. You can just count these]
+                                                  NEED WORD COUNT AND FIGURE COUNT
+
+
+Words:
+Figures:
 
 # Location on GitHub
 
-[A URL to the root directory of your final project on GitHub]
+https://github.com/karim-bolis/DS4B-final-project
 
 # Data Description
 
-Avonet is a database of morphological, geographical and ecological data for all birds ...
-
-[A brief (~100-200 words should be more than enough) description of the dataset, referencing any key publications that go with it]
+Avonet is an open-source database of morphological, geographical and ecological data for all bird species. It was compiled by Catherine Sheard and Joseph Tobias to serve as a tool for testing out theories in evolutionary biology, ecology and ecosystem science for the birds. (Tobias et al. 2021)
 
 # Questions/Aims
-
-
 
 [A brief section which first states and then justifies the questions/aims of your EDA. Must provide evidence of independent research into what has been done before on these questions/aims. See above for examples.]
 
 # Raw data
 
+Download the file named "AVONET from Supplementary dataset 1.xlsx" from https://figshare.com/articles/dataset/AVONET_morphological_ecological_and_geographical_data_for_all_birds_Tobias_et_al_2021_Ecology_Letters_/16586228.
+
+WorldClim data is downloaded below.
+
 ```{r}
 library(readxl)
 
-raw_birdlife = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=2)
-raw_ebird = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=3)
-raw_birdtree = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
+worldclim = getData("worldclim",var="bio",res=2.5, path="raw_data")
+
 ```
-
-
-
-[Explains how and where to get the exact raw data you got]
-[Is reproducible by a person (required) and a machine (ideally)]
 
 # Data wrangling
 
-[R chunks and prose which:]
-[Tidies up your raw data, outputs tidied_data.csv]
-[Cleans up your tidied data, outputs cleaned_data.csv]
+```{r}
+library(tidyverse)
+
+raw_birdtree = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
+avonet_birdtree = as_tibble(raw_birdtree)
+avonet_birdtree = avonet_birdtree %>%
+  mutate(row_id = row_number()) %>%
+  select(row_id, everything())
+
+write.csv(avonet_birdtree, file = "processed_data/tidied_data.csv", row.names = FALSE)
+
+excluded_data <- read.csv("processed_data/excluded_data.csv")
+tidied_data <- read.csv("processed_data/tidied_data.csv")
+cleaned_data <- tidied_data %>%
+  anti_join(excluded_data, by = "row_id")
+
+write.csv(cleaned_data, file = "processed_data/cleaned_data.csv", row.names = FALSE)
+
+
+```
 
 # Sanity checks
 
@@ -73,126 +87,6 @@ raw_birdtree = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# red list idea
-```{r}
-library(tidyverse)
-# remotes::install_github("traitecoevo/austraits")
-
-#remotes::install_github("guillembagaria/ggbiome")
-
-```
-
-# austraits
-
-```{r}
-library(austraits)
-austraits = load_austraits(version="4.1.0")
-
-austraits_species_list <- unique(austraits$traits$taxon_name)
-austraits_species_list = trimws(austraits_species_list)
-
-red_list_species = read_csv("data/redlist_species_data_37eb453b-68b3-42c2-8a5a-33fee5fffdbc/assessments.csv")
-
-typeof(red_list_species$scientificName)
-
-common_elements = austraits_species_list %in% red_list_species
-
-if (any(common_elements)) {
-  cat("The vectors have common elements:", vector1[common_elements], "\n")
-} else {
-  cat("No common elements found.\n")
-}
-
-```
 
 
 
@@ -275,7 +169,7 @@ library(raster)
 library(sp)
 
 
-r <- getData("worldclim",var="bio",res=2.5)
+r <- getData("worldclim",var="bio",res=2.5, path="raw_data")
 r <- r[[1]]
 # names(r) <- "Temp"
 # plot(r)
@@ -340,6 +234,8 @@ boxplots to find if pearson's coefficient is the more useful one, to check outli
 boxplot showed many outliers, so spearman may be better since pearson is affected by outliers, but clear linear correlation with extremely small confidence interval shows pearson may be better. Correlation coefficients show pearson is slightly better, but both are high
 
 So the aim here is to have a single, composite metric that captures the variation in the metrics of wing length and secondary length. We know the two measurements are highly correlated, so in theory the first principal component should capture a large amount of the data
+
+after we get PC1, we want to put it back into the data. Thankfully, vectors are ordered, so we can just put it back into avonet
 ```{r}
 library(psych)
 
@@ -383,6 +279,9 @@ head(avonet$Wing.Length)
 head(avonet$Secondary1)
 head(pc1)
 
+avonet$wing_pc1 = pc1
+
+head(avonet)
 
 
 ```
@@ -457,29 +356,44 @@ summary(model)
 
 # References
 
+Tobias, J. A., Sheard, C., Pigot, A. L., Devenish, A. J. M., Yang, J., Sayol, F., Neate-Clegg, M. H. C., Alioravainen, N., Weeks, T. L., Barber, R. A., Walkden, P. A., MacGregor, H. E. A., Jones, S. E. I., Vincent, C., Phillips, A. G., Marples, N. M., Montaño-Centellas, F. A., Leandro-Silva, V., Claramunt, S., … Schleuning, M. (2021). AVONET: morphological, ecological and geographical data for all birds, Ecology Letters (Vol. 25, Issue 3)
+
 for the compare_df_cols function in the janitor package: https://stackoverflow.com/questions/53264993/comparing-column-names-in-r-across-various-data-frames
 
 
 
 
+EXTRA CODE
 
+# red list idea
+```{r}
+library(tidyverse)
+# remotes::install_github("traitecoevo/austraits")
 
+#remotes::install_github("guillembagaria/ggbiome")
 
+```
 
+# austraits
 
+```{r}
+library(austraits)
+austraits = load_austraits(version="4.1.0")
 
+austraits_species_list <- unique(austraits$traits$taxon_name)
+austraits_species_list = trimws(austraits_species_list)
 
+red_list_species = read_csv("data/redlist_species_data_37eb453b-68b3-42c2-8a5a-33fee5fffdbc/assessments.csv")
 
+typeof(red_list_species$scientificName)
 
+common_elements = austraits_species_list %in% red_list_species
 
+if (any(common_elements)) {
+  cat("The vectors have common elements:", vector1[common_elements], "\n")
+} else {
+  cat("No common elements found.\n")
+}
 
-
-
-
-
-
-
-
-
-
+```
 

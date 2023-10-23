@@ -1,0 +1,11 @@
+document the process of choosing the dataset here
+
+```{r}
+# PROCESS OF CHOOSING DATASET FIRST
+excluded_data = tibble()
+
+write.csv(excluded_data, file = "excluded_data.csv", row.names = FALSE)
+
+
+```
+
