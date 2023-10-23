@@ -1,10 +1,121 @@
-document the process of choosing the dataset here
+---
+title: "Data Cleaning"
+author: "Karim Bolis u6671566"
+date: "14/10/23"
+output:  
+    html_document:
+        toc: true
+        toc_depth: 4
+        theme: cosmo
+        number_sections: false
+        toc_float: true
+        highlight: pygments
+        fig_width: 8
+        fig_height: 4
+---
+
+# Location on GitHub
+
+https://github.com/karim-bolis/DS4B-final-project/blob/main/processed_data/data_cleaning.Rmd
+
+# Description
+
+This document details the process of choosing the most appropriate Avonet dataset for this study, as well as the data cleaning done to prepare the dataset to answer the main questions.
+
+Avonet is composed of an XLSX file with multiple sheets containing 3 main Avonet datasets, the raw data used to generate those datasets and multiple other sheets with metadata about them. The 3 main datasets do not differ by much, and represent 3 different taxonomic systems for classifying bird species; BirdLife, eBird and BirdTree. In each dataset, a single observation is a species, and the values for the trait coumns represents species means. The number of species sampled to find this mean is also given, as well as some metadata on the data collection process such as the trait values inferred
+
+First I loaded the excel sheets containing the 3 Avonet datasets and converted them to tibbles. I then compared the column names between them to see if there's data in some that is missing in others. I can immediately exclude the ebird dataset because it has no centroid lat/long values, which indicate the midpoint of the species range. This is necessary to get the annual temperature data for the species' environment. The birdtree dataset also has species extinction status, which allows for correlating the extinction status with the likelihood of following biogeographical rules. I then compared the no. of individuals used in each dataset to find that birdtree had the most, so I chose birdtree as the primary database. This was reflected in the creation of the tidied_data file in the main document.
+
+I first filtered out all the species with less than 3 individuals for which measurements were taken for each morphometric trait. I hypothesised that a smaller sample size than 3 is not enough to ensure the species means are reflective of the entire population, especially if among those 3 individuals only 1 or 2 measurements were taken for my studied traits. I also excluded species with missing centroid values. Finally, I excluded species for which the Wing Length and Secondary Length were inferred from adjacent species, as this would make detecting the presence of a gradient for those traits across a family of species more difficult and could skew results. Finally, I removed duplicates in the excluded data.
+
+Some sanity checks were then conducted, ensuring that column values were as expected. Based on the summary, I investigated some of the outliers in the data, such as the species with the highest mass, 
 
 ```{r}
-# PROCESS OF CHOOSING DATASET FIRST
-excluded_data = tibble()
+library(readxl)
+library(janitor)
 
-write.csv(excluded_data, file = "excluded_data.csv", row.names = FALSE)
+raw_birdlife = read_excel("../raw_data/AVONET Supplementary dataset 1.xlsx", sheet=2)
+raw_ebird = read_excel("../raw_data/AVONET Supplementary dataset 1.xlsx", sheet=3)
+raw_birdtree = read_excel("../raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
+raw_all = read_excel("../raw_data/AVONET Supplementary dataset 1.xlsx", sheet=6)
+
+avonet_birdlife = as_tibble(raw_birdlife)
+avonet_ebird = as_tibble(raw_ebird)
+avonet_birdtree = as_tibble(raw_birdtree)
+avonet_all = as_tibble(raw_all)
+
+compare_df_cols(avonet_birdlife,avonet_ebird, avonet_birdtree)
+
+print(sum(avonet_birdlife$Total.individuals))
+print(sum(avonet_ebird$Total.individuals))
+print(sum(avonet_birdtree$Total.individuals))
+
+avonet <- read_csv("tidied_data.csv")
+
+excluded_data = avonet %>%
+  filter(Complete.measures<3) %>%
+  mutate(
+    date="14/10/23",
+    exclusion_notes="Number of fully measured individuals is < 3"
+  )
+
+to_exclude = avonet %>%
+  filter(is.na(Centroid.Latitude) | is.na(Centroid.Longitude)) %>%
+  mutate(
+    date="19/10/23",
+    exclusion_notes="Missing centroid values means mean annual temperature cannot be found for species"
+  )
+excluded_data = bind_rows(excluded_data,to_exclude)
+
+to_exclude = avonet %>%
+  filter(str_detect(Traits.inferred, "Wing Length") | str_detect(Traits.inferred, "Secondary1")) %>%
+  mutate(
+    date="19/10/23",
+    exclusion_notes="Inferred traits may skew results when trying to detect patterns across adjacent species"
+  )
+excluded_data = bind_rows(excluded_data,to_exclude)
+
+excluded_data = distinct(excluded_data,row_id, .keep_all = TRUE)
+
+# Sanity Checks
+avonet = anti_join(avonet,excluded_data, by = "row_id")
+summary(avonet)
+print(nrow(filter(avonet,Female + Male + Unknown != Total.individuals)))
+print(nrow(filter(avonet,Complete.measures > Total.individuals)))
+print(filter(avonet,Mass==111000.00))
+print(filter(avonet,Beak.Length_Culmen==414.20))
+print(filter(avonet,Mass==111000.00))
+
+
+
+avonet = avonet %>%
+  mutate(Min.Latitude=as.double(Min.Latitude)) %>%
+  mutate(Max.Latitude=as.double(Max.Latitude)) %>%
+  mutate(Centroid.Latitude=as.double(Centroid.Latitude)) %>%
+  mutate(Centroid.Longitude=as.double(Centroid.Longitude)) %>%
+  mutate(Range.Size=as.double(Range.Size))
+
+# get an overview of the data
+summary(avonet)
+
+# OTHER THINGS LIKE CHECKING SPECIES.STATUS IS EITHER "Extinct, Exant or Invalid". but honestly if you're out of time you can just say you did it in excel in the text
+
+
+# FILTER OUT ROWS THAT DON'T HAVE VALUES FOR THE TRAITS YOU WANT TO MEASURE
+
+# avonet_all_means_medians = avonet_all %>%
+#   group_by("Species3_BirdTree") %>%
+#   MEANS AND MEDIANS OF EVERYTHING
+#   rowwise() %>%
+#   mutate(ratio_VALUE1 = max(c(mean_VALLUE1, median_VALUE1)) / min(c(mean_VALUE1, median_VALUE1)) )
+
+
+
+
+
+
+
+write_csv(excluded_data, file = "excluded_data.csv")
 
 
 ```

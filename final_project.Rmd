@@ -49,28 +49,41 @@ worldclim = getData("worldclim",var="bio",res=2.5, path="raw_data")
 
 # Data wrangling
 
+
+                                 USE STYLR ON CODE FOR READABILITY AND ADDRESS FEEDBACK FROM SHORT REPORT 1
+
+
+
+
 ```{r}
 library(tidyverse)
 
-raw_birdtree = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
-avonet_birdtree = as_tibble(raw_birdtree)
-avonet_birdtree = avonet_birdtree %>%
+raw_avonet = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
+avonet = as_tibble(raw_birdtree)
+avonet = avonet %>%
   mutate(row_id = row_number()) %>%
   select(row_id, everything())
 
-write.csv(avonet_birdtree, file = "processed_data/tidied_data.csv", row.names = FALSE)
+write_csv(avonet, file = "processed_data/tidied_data.csv")
 
-excluded_data <- read.csv("processed_data/excluded_data.csv")
-tidied_data <- read.csv("processed_data/tidied_data.csv")
+excluded_data <- read_csv("processed_data/excluded_data.csv")
+tidied_data <- read_csv("processed_data/tidied_data.csv")
 cleaned_data <- tidied_data %>%
   anti_join(excluded_data, by = "row_id")
 
-write.csv(cleaned_data, file = "processed_data/cleaned_data.csv", row.names = FALSE)
+write_csv(cleaned_data, file = "processed_data/cleaned_data.csv")
 
 
 ```
 
 # Sanity checks
+
+```{r}
+
+check that there aren't any NA values in the centroids for example, etc.
+
+```
+
 
 [R chunks and prose which perform sanity checks on your cleaned data]
 [Remember that this really just summarises that your data are OK after you've cleaned them]
@@ -83,6 +96,14 @@ write.csv(cleaned_data, file = "processed_data/cleaned_data.csv", row.names = FA
 # References
 
 [References you have cited throughout your text]
+
+
+
+
+
+
+
+
 
 
 
