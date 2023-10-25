@@ -28,11 +28,14 @@ First I loaded the excel sheets containing the 3 Avonet datasets and converted t
 
 I first filtered out all the species with less than 3 individuals for which measurements were taken for each morphometric trait. I hypothesised that a smaller sample size than 3 is not enough to ensure the species means are reflective of the entire population, especially if among those 3 individuals only 1 or 2 measurements were taken for my studied traits. I also excluded species with missing centroid values. Finally, I excluded species for which the Wing Length and Secondary Length were inferred from adjacent species, as this would make detecting the presence of a gradient for those traits across a family of species more difficult and could skew results. Finally, I removed duplicates in the excluded data.
 
-Some sanity checks were then conducted, ensuring that column values were as expected. Based on the summary, I investigated some of the outliers in the data, such as the species with the highest mass, 
+Some sanity checks were then conducted, ensuring that column values were as expected. Based on the summary of the data, I investigated some of the outliers in the data, such as the species with the highest mass and beak length, by looking them up. Some additional checks were made i Excel to ensure values like the Species Status had values that were in line with the metadata.
+
+
 
 ```{r}
 library(readxl)
 library(janitor)
+library(tidyverse)
 
 raw_birdlife = read_excel("../raw_data/AVONET Supplementary dataset 1.xlsx", sheet=2)
 raw_ebird = read_excel("../raw_data/AVONET Supplementary dataset 1.xlsx", sheet=3)
@@ -77,29 +80,18 @@ excluded_data = bind_rows(excluded_data,to_exclude)
 
 excluded_data = distinct(excluded_data,row_id, .keep_all = TRUE)
 
-# Sanity Checks
 avonet = anti_join(avonet,excluded_data, by = "row_id")
 summary(avonet)
 print(nrow(filter(avonet,Female + Male + Unknown != Total.individuals)))
 print(nrow(filter(avonet,Complete.measures > Total.individuals)))
 print(filter(avonet,Mass==111000.00))
 print(filter(avonet,Beak.Length_Culmen==414.20))
-print(filter(avonet,Mass==111000.00))
+print(filter(avonet,Beak.Length_Nares==389.8))
+print(filter(avonet,Wing.Length==789.90))
+print(filter(avonet,Secondary1==629.10))
+print(filter(avonet,Tail.Length==812.8))
 
-
-
-avonet = avonet %>%
-  mutate(Min.Latitude=as.double(Min.Latitude)) %>%
-  mutate(Max.Latitude=as.double(Max.Latitude)) %>%
-  mutate(Centroid.Latitude=as.double(Centroid.Latitude)) %>%
-  mutate(Centroid.Longitude=as.double(Centroid.Longitude)) %>%
-  mutate(Range.Size=as.double(Range.Size))
-
-# get an overview of the data
 summary(avonet)
-
-# OTHER THINGS LIKE CHECKING SPECIES.STATUS IS EITHER "Extinct, Exant or Invalid". but honestly if you're out of time you can just say you did it in excel in the text
-
 
 # FILTER OUT ROWS THAT DON'T HAVE VALUES FOR THE TRAITS YOU WANT TO MEASURE
 
@@ -111,11 +103,36 @@ summary(avonet)
 
 
 
-
-
-
-
 write_csv(excluded_data, file = "excluded_data.csv")
+
+
+```
+
+
+
+# Extra Code
+
+This code is left here as supplementary information. It shows an attempt to run a Bayesian phylogenetic generalized linear mixed model (PGLMM). This model would have taken into account the phylogenetic history of the species being studied, which is likely to affect the differences in trait measurments between them.
+```{r}
+library(MCMCglmm)
+
+avonet = avonet %>%
+  mutate(mean_annual_temp = get_mean_annual_temp_1(r, Centroid.Latitude, Centroid.Longitude))
+
+print(nrow(avonet))
+avonet = filter(avonet, !is.na(mean_annual_temp))
+print(nrow(avonet))
+
+
+# Fit the Bayesian PGLMM
+model <- MCMCglmm(Wing.Length ~ mean_annual_temp,
+                   random = ~Species,
+                   family = "gaussian",
+                   data = bird_data,
+                   pedigree = Phylogeny)
+
+# Summarize the model
+summary(model)
 
 
 ```

@@ -62,7 +62,12 @@ raw_avonet = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
 avonet = as_tibble(raw_birdtree)
 avonet = avonet %>%
   mutate(row_id = row_number()) %>%
-  select(row_id, everything())
+  select(row_id, everything()) %>%
+  mutate(Min.Latitude=as.double(Min.Latitude)) %>%
+  mutate(Max.Latitude=as.double(Max.Latitude)) %>%
+  mutate(Centroid.Latitude=as.double(Centroid.Latitude)) %>%
+  mutate(Centroid.Longitude=as.double(Centroid.Longitude)) %>%
+  mutate(Range.Size=as.double(Range.Size))
 
 write_csv(avonet, file = "processed_data/tidied_data.csv")
 
@@ -73,12 +78,14 @@ cleaned_data <- tidied_data %>%
 
 write_csv(cleaned_data, file = "processed_data/cleaned_data.csv")
 
+avonet <- read_csv("processed_data/cleaned_data.csv")
 
 ```
 
 # Sanity checks
 
 ```{r}
+
 
 check that there aren't any NA values in the centroids for example, etc.
 
@@ -89,159 +96,47 @@ check that there aren't any NA values in the centroids for example, etc.
 [Remember that this really just summarises that your data are OK after you've cleaned them]
 [Most of the real sanity checks and data cleaning go on in the data_cleaning.Rmd file]
 
-# Addressing the questions/aims
-
-[This is the *main* section of your work. For example, if you are doing an EDA, this is where you would summarise it. If you are building something like a package or shiny app, a description of that package / app and demonstration of its function(s) would go here. Use appropriate sub-headings.]
-
-# References
-
-[References you have cited throughout your text]
+# Does Allen's rule apply to...
 
 
+[Use appropriate sub-headings]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## Introduction
 
 As the climate gets hotter, ornithologists have found that birds tend to get smaller. This is consistent with one of ecology's oldest rules: Bergmann's rule. It states that in hotter climates, body sizes tend to shrink, as the increase in surface-area-to-volume ratio results in more heat exchange with the environment and better heat loss.
 
-Notes:
-first I loaded the excel sheet containing the different AvoNets, then I compared the column names between them to see if there's data in one that is missing in the others
-
-avonet_ebird was excluded because it has no centroid values so no way to find species locations.
-
-avonet_birdtree has species status, which is missing from avonet_birdlife for some reason, even though birdtree got its data from the birdlife database
-
 ```{r}
-library(readxl)
-library(janitor)
-raw_birdlife = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=2)
-raw_ebird = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=3)
-raw_birdtree = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
-raw_all = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=6)
-
-avonet_birdlife = as_tibble(raw_birdlife)
-avonet_ebird = as_tibble(raw_ebird)
-avonet_birdtree = as_tibble(raw_birdtree)
-avonet_all = as_tibble(raw_all)
-
-compare_df_cols(avonet_birdlife,avonet_ebird, avonet_birdtree)
-
-# compare number of individuals in datasets
-print(sum(avonet_birdlife$Total.individuals))
-print(sum(avonet_ebird$Total.individuals))
-print(sum(avonet_birdtree$Total.individuals))
-
-# choose birdtree as primary database and filter species with too low numbers
-avonet = filter(avonet_birdtree,Total.individuals>=3)
-
-# sanity checks
-print(nrow(filter(avonet,Female + Male + Unknown != Total.individuals)))
-print(nrow(filter(avonet,Complete.measures > Total.individuals)))
-print(filter(avonet,Mass==111000.00))
-
-avonet = avonet %>%
-  mutate(Min.Latitude=as.double(Min.Latitude)) %>%
-  mutate(Max.Latitude=as.double(Max.Latitude)) %>%
-  mutate(Centroid.Latitude=as.double(Centroid.Latitude)) %>%
-  mutate(Centroid.Longitude=as.double(Centroid.Longitude)) %>%
-  mutate(Range.Size=as.double(Range.Size))
-
-# get an overview of the data
-summary(avonet)
-
-# OTHER THINGS LIKE CHECKING SPECIES.STATUS IS EITHER "Extinct, Exant or Invalid". but honestly if you're out of time you can just say you did it in excel in the text
-
-
-# FILTER OUT ROWS THAT DON'T HAVE VALUES FOR THE TRAITS YOU WANT TO MEASURE
-
-# avonet_all_means_medians = avonet_all %>%
-#   group_by("Species3_BirdTree") %>%
-#   MEANS AND MEDIANS OF BEAKS OR OTHER APPENDAGE??
-#   rowwise() %>%
-#   mutate(ratio_VALUE1 = max(c(mean_VALLUE1, median_VALUE1)) / min(c(mean_VALUE1, median_VALUE1)) )
-
-# check for empty or missing values
-any(is.na(avonet))
-
-# exclude species with no centroids
-avonet = filter(avonet, !is.na(Centroid.Latitude) & !is.na(Centroid.Longitude))
 
 
 
 ```
 
+
 Finding the mean annual temperature from a lat/long
+
+mention that the temperature is multiplied by 10
 
 ```{r}
 library(raster)
 library(sp)
 
-
-r <- getData("worldclim",var="bio",res=2.5, path="raw_data")
-r <- r[[1]]
+worldclim <- worldclim[[1]]
 # names(r) <- "Temp"
 # plot(r)
 
-get_mean_annual_temp_1 <- function(climate_data, lat, long) {
+# Extract temperature value at the specified lat/long
+get_mean_annual_temp <- function(climate_data, lat, long) {
   point = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = climate_data@crs)
-  
-  # Extract temperature value at the specified lat/long location
   return(raster::extract(climate_data, point))
 }
 
-mean_annual_temp = get_mean_annual_temp_1(r,66,96)
-print(mean_annual_temp)
 
+avonet = avonet %>%
+  mutate(mean_annual_temp = get_mean_annual_temp(worldclim, Centroid.Latitude, Centroid.Longitude)/10)
 
+avonet = filter(avonet, !is.na(mean_annual_temp))
 
-
-
-
-
-# setwd("data/wc2.1_10m_tavg")
-# 
-# months <- c("wc2.1_10m_tavg_01.tif", "wc2.1_10m_tavg_02.tif", "wc2.1_10m_tavg_03.tif", "wc2.1_10m_tavg_04.tif", "wc2.1_10m_tavg_05.tif", "wc2.1_10m_tavg_06.tif", "wc2.1_10m_tavg_07.tif", "wc2.1_10m_tavg_08.tif", "wc2.1_10m_tavg_09.tif", "wc2.1_10m_tavg_10.tif", "wc2.1_10m_tavg_11.tif", "wc2.1_10m_tavg_12.tif")
-# 
-# months_raster = lapply(months,raster)
-# 
-# get_mean_annual_temp <- function(raster_list, lat, long) {
-#   points = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = raster_list[[1]]@crs)
-# 
-#   # Initialize an empty list to store extracted values
-#   extracted_values <- numeric(length(raster_list))
-# 
-#   # Loop through each raster in the list
-#   for (i in 1:length(raster_list)) {
-#     
-#     # Extract temperature value at the specified lat/long location
-#     extracted_value = raster::extract(raster_list[[i]], points)
-#     
-#     # Append extracted value to the list
-#     extracted_values[i] = extracted_value
-#   }
-#   
-#   # Return the list of extracted values (one value for each raster)
-#   return(mean(extracted_values))
-# }
-# 
-# mean_annual_temp = get_mean_annual_temp(months_raster,66,96)
-# print(mean_annual_temp)
-
-
-
+head(avonet)
 
 ```
 
@@ -257,6 +152,16 @@ boxplot showed many outliers, so spearman may be better since pearson is affecte
 So the aim here is to have a single, composite metric that captures the variation in the metrics of wing length and secondary length. We know the two measurements are highly correlated, so in theory the first principal component should capture a large amount of the data
 
 after we get PC1, we want to put it back into the data. Thankfully, vectors are ordered, so we can just put it back into avonet
+
+basically start by saying that the hypothesis is that measurments 6 and 7 would correlate strongly so would be more powerful in a PCA than alone, but the other ones like HWI, Kipp's distance and Tail Length may not correlate to each other as much
+
+
+pearson assumptions: 
+The relationship between X and Y is linear.
+The frequency distributions of X and Y separately are normal.
+
+spearman assumptions:
+linear relationship
 ```{r}
 library(psych)
 
@@ -273,7 +178,7 @@ ggplot(avonet, aes(x = 1, y = Wing.Length)) +
 
 ggplot(avonet, aes(x = 1, y = Wing.Length)) +
   geom_violin(fill = "blue") +
-  labs(y = "Value") +
+  labs(y = "Trait Value") +
   theme_minimal() +
   labs(x = "Distributions") +
   geom_violin(data = avonet, aes(x = 2, y = Secondary1), fill = "red") +
@@ -289,7 +194,7 @@ correlation_value_spearman = cor(avonet$Wing.Length, avonet$Secondary1, method =
 print(correlation_value_pearson)
 print(correlation_value_spearman)
 
-# Perform PCA using the Pearson correlation matrix
+
 pca_model = principal(select(avonet,Wing.Length,Secondary1), nfactors = 2, rotate='none')
 summary(pca_model)
 print(pca_model)
@@ -314,64 +219,273 @@ head(avonet)
 
 
 normal correlation
+
+I suppose one of the reasons the PC1 didn't end up bein that strong a predictor could be the presence of many outliers in the data, which can skew the results. but i didnt use spearman or pearson to do the pca so dont say that, I think chatgpt made that stuff up. you know what, it's probably because the correlation of the secondary length by itself is so bad, so it drags down that of the Wing Length. 
+
+SO BASED ON THIS ^ MAYBE TRY PCA WITH THE ONES THAT DO HAVE A GOOD CORRELATION
+
 ```{r}
-
-# start with violin plot visualisation of distributions of wing length in different families to provide proof that we must study different families separately
-
-
-
-# correlations
-
-avonet_Accipitridae = filter(avonet,Family3=="Accipitridae")
-wg_mat_acc = lm(data = avonet_Accipitridae, mean_annual_temp ~ Wing.Length)
-summary(wg_mat_acc)
-
-correlation_value_pearson = cor(,avonet$mean_annual_temp, method = "pearson")
-print(correlation_value_pearson)
-correlation_value_spearman =
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-attempt at running a Bayesian phylogenetic generalized linear mixed model (PGLMM)
-```{r}
-library(MCMCglmm)
 
 avonet = avonet %>%
-  mutate(mean_annual_temp = get_mean_annual_temp_1(r, Centroid.Latitude, Centroid.Longitude))
+  group_by(Family3) %>%
+  mutate(temp_range=max(mean_annual_temp)-min(mean_annual_temp))
 
-print(nrow(avonet))
-avonet = filter(avonet, !is.na(mean_annual_temp))
-print(nrow(avonet))
+nrow(avonet)
+avonet = filter(avonet,temp_range>10)
+nrow(avonet)
+
+avonet = avonet %>%
+  group_by(Family3) %>%
+  mutate(no_species_in_family=n())
+
+avonet = filter(avonet,no_species_in_family>10)
+
+Anatidae_Tyrannidae <- avonet %>%
+  filter(Family3 %in% c("Anatidae", "Tyrannidae"))
+
+ggplot(Anatidae_Tyrannidae, aes(x = wing_pc1)) +
+  geom_histogram(binwidth = 0.2, fill = "blue", color = "black", alpha = 0.7) +
+  facet_wrap(~Family3, ncol = 2) +
+  labs(x = "Wing_PC1", y = "Frequency") +
+  ggtitle("Histograms of PC1 Values for Anatidae and Tyrannidae")
 
 
-# Fit the Bayesian PGLMM
-model <- MCMCglmm(Wing.Length ~ mean_annual_temp,
-                   random = ~Species,
-                   family = "gaussian",
-                   data = bird_data,
-                   pedigree = Phylogeny)
 
-# Summarize the model
-summary(model)
+ggplot(avonet, aes(x = mean_annual_temp, y = Mass)) +
+  scale_y_log10() +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm')
 
+ggplot(avonet, aes(x = mean_annual_temp, y = Kipps.Distance)) +
+  scale_y_log10() +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm')
+
+ggplot(avonet, aes(x = `Hand-Wing.Index`, y = Kipps.Distance)) +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm')
+
+ggplot(avonet, aes(x = Wing.Length, y = Secondary1)) +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm')
+
+
+cat("Wing Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Wing.Length)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Wing.Length),"\n")
+
+cat("Secondary Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Secondary1)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Secondary1),"\n")
+
+cat("Wing PC1 p-value:",cor.test(avonet$mean_annual_temp,avonet$wing_pc1)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$wing_pc1),"\n")
+
+cat("Hand-Wing Index p-value:",cor.test(avonet$mean_annual_temp,avonet$`Hand-Wing.Index`)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$`Hand-Wing.Index`),"\n")
+
+cat("Kipps Distance p-value:",cor.test(avonet$mean_annual_temp,avonet$Kipps.Distance)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Kipps.Distance),"\n")
+
+cat("Tail Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Tail.Length)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Tail.Length),"\n")
+
+correlation_p_values_pearson <- avonet %>%
+  group_by(Family3) %>%
+  summarize(
+    p_value_Wing_Length = cor.test(mean_annual_temp, Wing.Length)$p.value,
+    r_value_Wing_Length = cor(mean_annual_temp, Wing.Length),
+    p_value_Secondary1 = cor.test(mean_annual_temp, Secondary1)$p.value,
+    r_value_Secondary1 = cor(mean_annual_temp, Wing.Length),
+    p_value_wing_pc1 = cor.test(mean_annual_temp, wing_pc1)$p.value,
+    r_value_wing_pc1 = cor(mean_annual_temp, Wing.Length),
+    p_value_Hand_Wing_Index = cor.test(mean_annual_temp, `Hand-Wing.Index`)$p.value,
+    r_value_Hand_Wing_Index = cor(mean_annual_temp, Wing.Length),
+    p_value_Kipps_dist = cor.test(mean_annual_temp, Kipps.Distance)$p.value,
+    r_value_Kipps_dist = cor(mean_annual_temp, Wing.Length),
+    p_value_Tail_Length = cor.test(mean_annual_temp, Tail.Length)$p.value,
+    r_value_Tail_Length = cor(mean_annual_temp, Wing.Length)
+  ) %>%
+  ungroup()
+
+# Spearman
+cat("Wing Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Wing.Length,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Wing.Length),"\n")
+
+cat("Secondary Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Secondary1,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Secondary1),"\n")
+
+cat("Wing PC1 p-value:",cor.test(avonet$mean_annual_temp,avonet$wing_pc1,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$wing_pc1),"\n")
+
+cat("Hand-Wing Index p-value:",cor.test(avonet$mean_annual_temp,avonet$`Hand-Wing.Index`,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$`Hand-Wing.Index`),"\n")
+
+cat("Kipps Distance p-value:",cor.test(avonet$mean_annual_temp,avonet$Kipps.Distance,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Kipps.Distance),"\n")
+
+cat("Tail Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Tail.Length,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Tail.Length),"\n")
+
+correlation_p_values_spearman <- avonet %>%
+  group_by(Family3) %>%
+  summarize(
+    p_value_Wing_Length = cor.test(mean_annual_temp, Wing.Length, method = "spearman")$p.value,
+    p_value_Secondary1 = cor.test(mean_annual_temp, Secondary1, method = "spearman")$p.value,
+    p_value_wing_pc1 = cor.test(mean_annual_temp, wing_pc1,  method = "spearman")$p.value,
+    p_value_Hand_Wing_Index = cor.test(mean_annual_temp, `Hand-Wing.Index`, method = "spearman")$p.value,
+    p_value_Kipps_dist = cor.test(mean_annual_temp, Kipps.Distance, method = "spearman")$p.value,
+    p_value_Tail_Length = cor.test(mean_annual_temp, Tail.Length, method = "spearman")$p.value
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+
+
+
+# correlations_modified <- correlation_p_values_pearson %>%
+#   pivot_longer(
+#     cols = starts_with("p_value_"),
+#     names_to = "trait",
+#     values_to = "p_value"
+#   )
+# 
+# ggplot(correlations_modified, aes(x = p_value, y = Family3, color = trait)) +
+#   geom_point(size = 3) +
+#   geom_vline(xintercept = 0.5, linetype = "dashed") +
+#   theme_minimal() +
+#   labs(
+#     x = "p-value",
+#     y = "Family",
+#     title = "Comparison of p-values for Different Families and Traits"
+#   ) +
+#   scale_color_manual(
+#     values = c("p_value_Wing_Length" = "red", "p_value_Secondary1" = "blue", "p_value_wing_pc1" = "green"),
+#     labels = c("Wing.Length", "Secondary1", "wing_pc1")
+#   ) +
+#   guides(color = guide_legend(title = "Traits"))
+# 
+
+
+
+
+
+
+
+ggplot(correlation_p_values_pearson, aes(x = 1, y = p_value_Wing_Length)) +
+  geom_boxplot(fill = "blue") +
+  labs(y = "Trait p-values") +
+  labs(x = "Distributions") +
+  geom_boxplot(data = correlation_p_values_pearson, aes(x = 2, y = p_value_Secondary1), fill = "red") +
+  geom_boxplot(data = correlation_p_values_pearson, aes(x = 3, y = p_value_wing_pc1), fill = "green") +
+  geom_boxplot(data = correlation_p_values_pearson, aes(x = 4, y = p_value_Hand_Wing_Index), fill = "purple") +
+  geom_boxplot(data = correlation_p_values_pearson, aes(x = 5, y = p_value_Kipps_dist), fill = "yellow") +
+  geom_boxplot(data = correlation_p_values_pearson, aes(x = 6, y = p_value_Tail_Length), fill = "black") +
+  geom_hline(yintercept = 0.05, linetype = "dashed") +
+  scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6), labels = c("Wing Length","Secondary Length","Wing PC1","Hand-Wing Index", "Kipps Distance", "Tail Length"))
+
+
+
+ggplot(correlation_p_values_spearman, aes(x = 1, y = p_value_Wing_Length)) +
+  geom_boxplot(fill = "blue") +
+  labs(y = "Trait p-values") +
+  labs(x = "Distributions") +
+  geom_boxplot(data = correlation_p_values_spearman, aes(x = 2, y = p_value_Secondary1), fill = "red") +
+  geom_boxplot(data = correlation_p_values_spearman, aes(x = 3, y = p_value_wing_pc1), fill = "green") +
+  geom_boxplot(data = correlation_p_values_spearman, aes(x = 4, y = p_value_Hand_Wing_Index), fill = "purple") +
+  geom_boxplot(data = correlation_p_values_spearman, aes(x = 5, y = p_value_Kipps_dist), fill = "yellow") +
+  geom_boxplot(data = correlation_p_values_spearman, aes(x = 6, y = p_value_Tail_Length), fill = "black") +
+  geom_hline(yintercept = 0.05, linetype = "dashed") +
+  scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6), labels = c("Wing Length","Secondary Length","Wing PC1","Hand-Wing Index", "Kipps Distance", "Tail Length"))
+
+head(correlation_p_values_pearson)
+head(correlation_p_values_spearman)
+
+nrow(filter(correlation_p_values_pearson,p_value_Wing_Length<0.05))
+nrow(filter(correlation_p_values_pearson,p_value_Secondary1<0.05))
+nrow(filter(correlation_p_values_pearson,p_value_wing_pc1<0.05))
+nrow(filter(correlation_p_values_pearson,p_value_Hand_Wing_Index<0.05))
+nrow(filter(correlation_p_values_pearson,p_value_Kipps_dist<0.05))
+nrow(filter(correlation_p_values_pearson,p_value_Tail_Length<0.05))
+
+nrow(filter(correlation_p_values_spearman,p_value_Wing_Length<0.05))
+nrow(filter(correlation_p_values_spearman,p_value_Secondary1<0.05))
+nrow(filter(correlation_p_values_spearman,p_value_wing_pc1<0.05))
+nrow(filter(correlation_p_values_spearman,p_value_Hand_Wing_Index<0.05))
+nrow(filter(correlation_p_values_spearman,p_value_Kipps_dist<0.05))
+nrow(filter(correlation_p_values_spearman,p_value_Tail_Length<0.05))
+
+
+HWI_significant_correlations = correlation_p_values_pearson %>%
+  select(Family3,p_value_Hand_Wing_Index,r_value_Hand_Wing_Index) %>%
+  filter(p_value_Hand_Wing_Index<0.05)
+
+summary(HWI_significant_correlations)
+
+most_negative_family = HWI_significant_correlations %>%
+  arrange(r_value_Hand_Wing_Index) %>%
+  slice(1)
+
+print(most_negative_family)
+
+
+Remizidae_data = filter(avonet,Family3=="Remizidae")
+Remizidae_lm = lm(data = Remizidae_data, `Hand-Wing.Index` ~ mean_annual_temp)
+summary(Remizidae_lm)
+
+nrow(Remizidae_data)
+
+ggplot(Remizidae_data, aes(x = mean_annual_temp, y = `Hand-Wing.Index`)) +
+  scale_y_log10() +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm')
+
+
+
+
+
+
+
+most_positive_family = HWI_significant_correlations %>%
+  arrange(desc(r_value_Hand_Wing_Index)) %>%
+  slice(1)
+
+print(most_positive_family)
+
+Musophagidae_data = filter(avonet,Family3=="Musophagidae")
+Musophagidae_lm = lm(data = Musophagidae_data, `Hand-Wing.Index` ~ mean_annual_temp)
+summary(Musophagidae_lm)
+
+nrow(Musophagidae_data)
+
+ggplot(Musophagidae_data, aes(x = mean_annual_temp, y = `Hand-Wing.Index`)) +
+  scale_y_log10() +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm')
+
+
+# significant_family_means = avonet %>%
+#   filter(Family3 %in% HWI_significant_correlations$Family3) %>%
+#   select(Family3,`Hand-Wing.Index`) %>%
+#   mutate(HWI_mean)
+#   
 
 ```
+
+Explaining why Remizidae species experience a strong negative correlation between warm temperatures and HWI.
+
+First look into if HWI is actually a good proxy for appendage size. the formula is rather complicated
+
+find situations where allens rule was the opposite in literature
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -380,6 +494,32 @@ summary(model)
 Tobias, J. A., Sheard, C., Pigot, A. L., Devenish, A. J. M., Yang, J., Sayol, F., Neate-Clegg, M. H. C., Alioravainen, N., Weeks, T. L., Barber, R. A., Walkden, P. A., MacGregor, H. E. A., Jones, S. E. I., Vincent, C., Phillips, A. G., Marples, N. M., Montaño-Centellas, F. A., Leandro-Silva, V., Claramunt, S., … Schleuning, M. (2021). AVONET: morphological, ecological and geographical data for all birds, Ecology Letters (Vol. 25, Issue 3)
 
 for the compare_df_cols function in the janitor package: https://stackoverflow.com/questions/53264993/comparing-column-names-in-r-across-various-data-frames
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -417,4 +557,73 @@ if (any(common_elements)) {
 }
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Extra code for finding temperature data
+
+```{r}
+# setwd("data/wc2.1_10m_tavg")
+# 
+# months <- c("wc2.1_10m_tavg_01.tif", "wc2.1_10m_tavg_02.tif", "wc2.1_10m_tavg_03.tif", "wc2.1_10m_tavg_04.tif", "wc2.1_10m_tavg_05.tif", "wc2.1_10m_tavg_06.tif", "wc2.1_10m_tavg_07.tif", "wc2.1_10m_tavg_08.tif", "wc2.1_10m_tavg_09.tif", "wc2.1_10m_tavg_10.tif", "wc2.1_10m_tavg_11.tif", "wc2.1_10m_tavg_12.tif")
+# 
+# months_raster = lapply(months,raster)
+# 
+# get_mean_annual_temp <- function(raster_list, lat, long) {
+#   points = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = raster_list[[1]]@crs)
+# 
+#   # Initialize an empty list to store extracted values
+#   extracted_values <- numeric(length(raster_list))
+# 
+#   # Loop through each raster in the list
+#   for (i in 1:length(raster_list)) {
+#     
+#     # Extract temperature value at the specified lat/long location
+#     extracted_value = raster::extract(raster_list[[i]], points)
+#     
+#     # Append extracted value to the list
+#     extracted_values[i] = extracted_value
+#   }
+#   
+#   # Return the list of extracted values (one value for each raster)
+#   return(mean(extracted_values))
+# }
+# 
+# mean_annual_temp = get_mean_annual_temp(months_raster,66,96)
+# print(mean_annual_temp)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
