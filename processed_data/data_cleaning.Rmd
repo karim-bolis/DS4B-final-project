@@ -93,15 +93,6 @@ print(filter(avonet,Tail.Length==812.8))
 
 summary(avonet)
 
-
-# avonet_all_means_medians = avonet_all %>%
-#   group_by("Species3_BirdTree") %>%
-#   MEANS AND MEDIANS OF EVERYTHING
-#   rowwise() %>%
-#   mutate(ratio_VALUE1 = max(c(mean_VALLUE1, median_VALUE1)) / min(c(mean_VALUE1, median_VALUE1)) )
-
-
-
 write_csv(excluded_data, file = "excluded_data.csv")
 
 

@@ -16,7 +16,7 @@ output:
 
 # Word/figure count
 
-Words: 1999
+Words: 1989
 Figures: 7
 
 # Location on GitHub
@@ -50,6 +50,7 @@ worldclim = getData("worldclim",var="bio",res=2.5, path="raw_data")
 
 ```{r}
 library(tidyverse)
+library(readxl)
 
 raw_avonet = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
 avonet = as_tibble(raw_avonet)
@@ -172,7 +173,7 @@ avonet = filter(avonet,no_species_in_family>10)
 
 I first found the distribution of p values across families for each trait. I then transformed the results to produce p-value distribution boxplots, which showed that most relationships are not significant for the traits, with only the Hand-Wing Index median falling at or below the 0.05 line, and most traits containing relatively few significant families out of 96 families total.
 
-While the significant relationship counts featured some for all traits, Wing Length, Tail Length, Hand-Wing Index (HWI) and Kipps' Distance contained the most, so my analysis will focus on them. The PC1 from the Wing/Tail Length PCA seems to show a correlation between the two traits, rather than improving on them.
+While the significant relationship counts featured some for all traits, Wing Length, Tail Length, Hand-Wing Index (HWI) and Kipps' Distance contained the most. The PC1 from the Wing/Tail Length PCA seems to show a correlation between the two traits, rather than improving on them.
 The HWI is a metric of flight efficiency and ability to disperse in birds (Tobias et al. 2021, Claramunt 2021). It is equivalent to Kipps' length, explaining their similar numbers, and is not a measure of appendage length, more of relative ratios. (Claramunt 2021) Research has suggested that tropical species in hotter climates have less dispersal ability, increasing their sensitivity to habitat disturbance. (Sheard et al. 2020) This may explain why it is the most negatively correlated trait.
 
 
@@ -233,9 +234,9 @@ nrow(filter(correlation_values,p_value_Kipps_dist<0.05))
 ```
 
 The violin plots show that while most significantly correlated families for a trait show a negative correlation, all traits have at least some families where a positive trend is seen. Interestingly, correlation coefficients become scarce around 0, indicating that heavy selection pressures apply on each trait, regardless of direction.
-Assessing the families with the most correlation (by correlation coefficient) shows the  Remizidae family has the largest negative trend for Wing Length and Kipps' Distance, explaining 61-62% of the trait's variation through the mean annual temperature (r=-0.78^2 --> R=0.61). Predictably, it is one of the highest negatively correlated families for Hand-Wing Index as well. Musophagidae also occurs twice for showing the largest positive trend for the Hand-Wing Index and Kipp's Distance.
+Assessing the families with the most correlation (by correlation coefficient) shows the  Remizidae family has the largest negative trend for Wing Length and Kipps' Distance, explaining 61-62% of the trait's variation through the mean annual temperature (r=-0.78^2 --> R=0.61). Additionally, it is amongst the largest negatively correlated families for Tail Length. Amongst traits which directly measure appendage size, the Gruidae family shows the strongest positive correlation for Tail Length.
 
-Frohlich et al. found that various configurations of body size and appendage size allow organisms to adapt to climates. (Frohlich et al. 2023) In their findings, tarsus size actually decreased with temperature in smaller birds, producing the opposite effect to Allen's rule, while larger birds were more likely to obey the rule. (Frohlich et al. 2023) Indeed, Allen himself hypothesised that larger birds would be more likely to follow his rule. (Frohlich et al. 2023) The vastly different masses of Remizidae and Musophagidae birds support this. Additionally, Xu et al. found that passerines (Remizidae) exhibit a negative trend with annual mean temperature, while non-passerines (Musophagidae) exhibit a positive trend for bill and tarsus length. (Xu 2023) It is possible, then, that wing length is under a similar selection pressure to that producing these trends in tarsus length.
+Frohlich et al. found that various body/appendage size configurations allow organisms to adapt to climates. (Frohlich et al. 2023) In their findings, tarsus size actually decreased with temperature in smaller birds, producing the opposite effect to Allen's rule, while larger birds were more likely to obey the rule. (Frohlich et al. 2023) Indeed, Allen himself hypothesised that larger birds would be more likely to follow his rule. (Frohlich et al. 2023) The vastly different masses of Remizidae and Gruidae supports this. Additionally, Xu et al. found that passerines (Remizidae) exhibit a negative trend with annual mean temperature, while non-passerines (Gruidae) exhibit a positive trend for bill and tarsus length. (Xu 2023) It is possible, then, that Wing and Tai length are under similar selection pressures to that producing these trends in tarsus length.
 
 ```{r fig.width=10}
 
@@ -273,10 +274,15 @@ extreme_family_finder(correlations_significant,"Tail_Length")
 
 extreme_family_finder(correlations_significant,"Hand_Wing_Index")
 
-print(arrange(filter(correlations_p_r_values,Trait=="Hand_Wing_Index"),r_value))
+extreme_family_finder(correlations_significant,"Secondary1")
+
+extreme_family_finder(correlations_significant,"wing_tail_pc1")
+
+
+print(arrange(filter(correlations_p_r_values,Trait=="Tail_Length"),r_value))
 
 mean(filter(avonet,Family3=="Remizidae")$Mass)
-mean(filter(avonet,Family3=="Musophagidae")$Mass)
+mean(filter(avonet,Family3=="Gruidae")$Mass)
 
 ```
 
