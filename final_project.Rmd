@@ -1,5 +1,5 @@
 ---
-title: "Does Allen's rule apply to ..."
+title: "Does Allen's rule still apply to the world's Birds?"
 author: "Karim Bolis u6671566"
 date: "14/10/23"
 output:  
@@ -16,11 +16,8 @@ output:
 
 # Word/figure count
 
-                                                  NEED WORD COUNT AND FIGURE COUNT
-
-
-Words:
-Figures:
+Words: 1999
+Figures: 7
 
 # Location on GitHub
 
@@ -34,7 +31,7 @@ Avonet is an open-source database of morphological, geographical and ecological 
 
 ## Introduction
 
-As the climate gets hotter, ornithologists have found shifts in bird sizes, geographic ranges and phenology. (Tian & Benton 2020, Baldwin et al. 2023) This has sparked an interest in predicting future shifts using biogeographical rules which summarise large global trends. (Tian & Benton 2020) Allen's rule, one of the oldest ones, states that in hotter climates, endotherm appendages tend to become larger, as the increase in surface-area-to-volume ratio results in more heat exchange with the environment. (Allen 1877) Allen's rule has been studied extensively, often in conjunction with Bergmann's rule, which links body size with temperature. (Xu 2023, Symonds & Tattersall 2010,  Fohlich et al. 2023, Baldwin et al. 2023) Yet, published literature has only looked into bird beak dimensions and tarsus (foot) length as appendage size representatives, often neglecting wings and tails. The presence of feathering on these appendages may complicate results. During flight, birds lose 99% of the heat generated, mostly through their wings, yet heat conservation is also achieved by holding the wings close to one's torso (Weeks et al. 2023). Similarly, beaks are simultaneously involved in both heat dissipation and cold tolerance (Weeks et al. 2023) This study aims to understand how Wing and Tail Length factor into Allen's rule across the world's species.
+As the climate gets hotter, ornithologists have found shifts in bird sizes, geographic ranges and phenology. (Tian & Benton 2020, Baldwin et al. 2023) This has sparked an interest in predicting future shifts using biogeographical rules which summarise large global trends. (Tian & Benton 2020) Allen's rule, one of the oldest ones, states that in hotter climates, endotherm appendages tend to become larger, as the increase in surface-area-to-volume ratio results in more heat exchange with the environment. (Allen 1877) Allen's rule has been studied extensively, often in conjunction with Bergmann's rule, which links body size with temperature. (Xu 2023, Symonds & Tattersall 2010,  Frohlich et al. 2023, Baldwin et al. 2023) Yet, published literature has only looked into bird beak dimensions and tarsus (foot) length as appendage size representatives, often neglecting wings and tails. The presence of feathering on these appendages may complicate results. During flight, birds lose 99% of the heat generated, mostly through their wings, yet heat conservation is also achieved by holding the wings close to one's torso (Weeks et al. 2023). Similarly, beaks are simultaneously involved in both heat dissipation and cold tolerance (Weeks et al. 2023) This study aims to understand how Wing and Tail Length factor into Allen's rule across the world's species.
 
 # Raw data
 
@@ -44,7 +41,6 @@ WorldClim data is downloaded below.
 
 ```{r}
 library(raster)
-library(readxl)
 
 worldclim = getData("worldclim",var="bio",res=2.5, path="raw_data")
 
@@ -56,15 +52,12 @@ worldclim = getData("worldclim",var="bio",res=2.5, path="raw_data")
 library(tidyverse)
 
 raw_avonet = read_excel("raw_data/AVONET Supplementary dataset 1.xlsx", sheet=4)
-avonet = as_tibble(raw_birdtree)
+avonet = as_tibble(raw_avonet)
 avonet = avonet %>%
   mutate(row_id = row_number()) %>%
   select(row_id, everything()) %>%
-  mutate(Min.Latitude=as.double(Min.Latitude)) %>%
-  mutate(Max.Latitude=as.double(Max.Latitude)) %>%
   mutate(Centroid.Latitude=as.double(Centroid.Latitude)) %>%
   mutate(Centroid.Longitude=as.double(Centroid.Longitude)) %>%
-  mutate(Range.Size=as.double(Range.Size)) %>%
   mutate(Hand.Wing.Index=`Hand-Wing.Index`)
 
 write_csv(avonet, file = "processed_data/tidied_data.csv")
@@ -82,7 +75,7 @@ avonet <- read_csv("processed_data/cleaned_data.csv")
 
 # Sanity checks
 
-Most of the sanity checking was done in the data cleaning document. These extra checks ensure that data types are consistent with how they appear, that all species have location information to find their living range mean annual temperature and that none of the traits studied have been inferred from close relatives.
+Most of the sanity checking was done in the data cleaning document. These checks ensure that data types are consistent with how they appear, that all species have location information to find their living range mean annual temperature and that none of the traits studied have been inferred from close relatives.
 
 ```{r}
 
@@ -95,40 +88,26 @@ unique(avonet$Traits.inferred)
 
 ```
 
-                                                # Does Allen's rule apply to...
-
-
 # Report
 
 ## Obtaining annual temperature
 
-World Mean annual temperature data was downloaded from WorldClim above, who store data from 1970-2000 for the whole world. (Fick & Hijmans 2017) Using the raster package function "extract", I found the temperature for every lat/long spatial point representing the centre of a species living range. I filtered out species with no temperature as a result of their living range being too remote for data collection.
-
 ```{r}
 library(raster)
-library(sp)
+
+source("extra_functions.R")
 
 worldclim <- worldclim[[1]]
 plot(worldclim)
 
-get_mean_annual_temp <- function(climate_data, lat, long) {
-  point = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = climate_data@crs)
-  return(raster::extract(climate_data, point))
-}
+avonet = add_mean_annual_temp(avonet)
 
-avonet = avonet %>%
-  mutate(mean_annual_temp = get_mean_annual_temp(worldclim, Centroid.Latitude, Centroid.Longitude)/10)
-
-avonet = filter(avonet, !is.na(mean_annual_temp))
-
-# check temperature data was added
 head(avonet)
 
 ```
 
 ## PCA
-
-The distributions of wing and tail length seen in the violin plot show that while most values sit within a small range for both, there is a lot of outliers. Graphing them shows they have a linear relationship with narrow confidence intervals. To quantify the effect size, I found their pearson and spearman correlation coefficients. While both coefficients assume a linear relationship, pearson is heavily affected by outliers, so spearman performs better.
+The violin plot shows that most values in the distributions of wing and tail length sit within a small range, with lots of outliers. They have a clear linear relationship with narrow confidence intervals. To quantify the effect size, I found their pearson and spearman correlation coefficients. While both coefficients assume a linear relationship, pearson is heavily affected by outliers, so spearman performs better.
 
 This strong relationship indicates that a Principal component analysis, which reduces data dimensionality, could provide a way to capture both sets of data and provide a stronger correlate with mean annual temperature. This technique was previously used to capture bill size from its 4 dimensional measurments. (Baldwin et al. 2023) The first principal component, capturing 86% of both variables, was added to avonet.
 
@@ -156,14 +135,11 @@ print(correlation_value_pearson)
 print(correlation_value_spearman)
 
 pca_model = principal(select(avonet,Wing.Length,Tail.Length), nfactors = 2, rotate='none')
-summary(pca_model)
+print(pca_model)
 
 pc1 = pca_model$scores[,1]
 
 avonet$wing_tail_pc1 = pc1
-
-head(avonet)
-
 
 ```
 
@@ -194,34 +170,10 @@ avonet = avonet %>%
 avonet = filter(avonet,no_species_in_family>10)
 ```
 
-Initial results surprisingly showed that both Wing and Tail length negatively correlated with temperature across the data, with varying significance
-
-
-```{r}
-cat("Wing Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Wing.Length)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Wing.Length),"\n")
-
-cat("Tail Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Tail.Length)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Tail.Length),"\n")
-
-ggplot(avonet, aes(x = mean_annual_temp, y = Wing.Length)) +
-  scale_y_log10() +
-  geom_point(size = 0.01) +
-  geom_smooth(method = 'lm') +
-  labs(title = "Correlation of Wing Length & Mean Annual Temperature across all families") +
-  theme(plot.title = element_text(size = 12))
-
-ggplot(avonet, aes(x = mean_annual_temp, y = Tail.Length)) +
-  scale_y_log10() +
-  geom_point(size = 0.01) +
-  geom_smooth(method = 'lm') +
-  labs(title = "Correlation of Tail Length & Mean Annual Temperature across all families") +
-  theme(plot.title = element_text(size = 12))
-
-```
-
-To dig deeper, I first found the distribution of p values across families for each trait. The p-value distribution boxplots show that most relationships are not significant for the traits, with only the Hand-Wing Index median falling at or below the 0.05 line, and most traits containing only a few significant families.
+I first found the distribution of p values across families for each trait. I then transformed the results to produce p-value distribution boxplots, which showed that most relationships are not significant for the traits, with only the Hand-Wing Index median falling at or below the 0.05 line, and most traits containing relatively few significant families out of 96 families total.
 
 While the significant relationship counts featured some for all traits, Wing Length, Tail Length, Hand-Wing Index (HWI) and Kipps' Distance contained the most, so my analysis will focus on them. The PC1 from the Wing/Tail Length PCA seems to show a correlation between the two traits, rather than improving on them.
-The HWI is a metric of flight efficiency and ability to disperse in birds (Tobias et al. 2021). It is equivalent to Kipps' length, explaining their similar numbers, and is not a measure of appendage length, more of relative ratios. (Sheard et al. 2020) Research has suggested that tropical species in hotter climates have less dispersal ability, increasing their sensitivity to habitat disturbance. (Sheard et al. 2020) This may explain why it is the most negatively correlated trait.
+The HWI is a metric of flight efficiency and ability to disperse in birds (Tobias et al. 2021, Claramunt 2021). It is equivalent to Kipps' length, explaining their similar numbers, and is not a measure of appendage length, more of relative ratios. (Claramunt 2021) Research has suggested that tropical species in hotter climates have less dispersal ability, increasing their sensitivity to habitat disturbance. (Sheard et al. 2020) This may explain why it is the most negatively correlated trait.
 
 
 ```{r fig.width=10}
@@ -243,19 +195,27 @@ correlation_values <- avonet %>%
   ) %>%
   ungroup()
 
-correlations_modified <- correlation_values %>%
-  pivot_longer(
-    cols = starts_with("p_value_"),
-    names_to = "trait_p",
-    values_to = "p_value"
-  ) %>%
-  pivot_longer(
-    cols = starts_with("r_value_"),
-    names_to = "trait_r",
-    values_to = "r_value"
-  )
+correlations_p_values = select(correlation_values, Family3, p_value_Wing_Length, p_value_Tail_Length, p_value_wing_tail_pc1, p_value_Secondary1, p_value_Hand_Wing_Index, p_value_Kipps_dist)
 
-ggplot(correlations_modified, aes(x=trait_p, y=p_value, color=trait_p)) +
+correlations_p_values = correlations_p_values %>% pivot_longer(cols=c('p_value_Wing_Length', 'p_value_Tail_Length', 'p_value_wing_tail_pc1', 'p_value_Secondary1', 'p_value_Hand_Wing_Index', 'p_value_Kipps_dist'),
+                    names_to='Trait',
+                    values_to='p_value')
+
+correlations_p_values <- correlations_p_values %>%
+  mutate(Trait = substr(Trait, 9, nchar(Trait)))
+
+correlations_r_values = select(correlation_values, Family3, r_value_Wing_Length, r_value_Tail_Length, r_value_wing_tail_pc1, r_value_Secondary1, r_value_Hand_Wing_Index, r_value_Kipps_dist)
+
+correlations_r_values = correlations_r_values %>% pivot_longer(cols=c('r_value_Wing_Length', 'r_value_Tail_Length', 'r_value_wing_tail_pc1', 'r_value_Secondary1', 'r_value_Hand_Wing_Index', 'r_value_Kipps_dist'),
+                    names_to='Trait',
+                    values_to='r_value')
+
+correlations_r_values <- correlations_r_values %>%
+  mutate(Trait = substr(Trait, 9, nchar(Trait)))
+
+correlations_p_r_values <- inner_join(correlations_p_values, correlations_r_values, by = c("Family3", "Trait"))
+
+ggplot(correlations_p_r_values, aes(x=Trait, y=p_value, color=Trait)) +
   geom_hline(yintercept = 0.05, linetype = "dashed", color = "red") +
   geom_boxplot() +
   scale_x_discrete(labels = c("Hand-Wing Index","Kipps Distance","Secondary Length","Tail Length","Wing Length","Wing Tail PC1")) +
@@ -272,26 +232,16 @@ nrow(filter(correlation_values,p_value_Kipps_dist<0.05))
 
 ```
 
-The violin plots show that while most significantly correlated families for a trait show a negative correlation, all traits have at least some families where a positive trend is seen.
-Assessing the families with the most correlation (by correlation coefficient) shows that the  Remizidae family consistently shows the clearest negative trend between mean annual temperature and wing length, HWI, Kipps' distance and Tail Length, in some cases showing a correlation that explains 76% of the trait's variation through the mean annual temperature (r=-0.88^2 --> R=0.76).
+The violin plots show that while most significantly correlated families for a trait show a negative correlation, all traits have at least some families where a positive trend is seen. Interestingly, correlation coefficients become scarce around 0, indicating that heavy selection pressures apply on each trait, regardless of direction.
+Assessing the families with the most correlation (by correlation coefficient) shows the  Remizidae family has the largest negative trend for Wing Length and Kipps' Distance, explaining 61-62% of the trait's variation through the mean annual temperature (r=-0.78^2 --> R=0.61). Predictably, it is one of the highest negatively correlated families for Hand-Wing Index as well. Musophagidae also occurs twice for showing the largest positive trend for the Hand-Wing Index and Kipp's Distance.
 
-
-
-
-frohlich said the trend reverses in smaller birds, and that's what I found!!
-
-
-
-
-Ecological predictors of interspecific variation in bird bill and leg lengths on a global scale: they found opposite effects in passerines vs non-passerines in bird dimensions
+Frohlich et al. found that various configurations of body size and appendage size allow organisms to adapt to climates. (Frohlich et al. 2023) In their findings, tarsus size actually decreased with temperature in smaller birds, producing the opposite effect to Allen's rule, while larger birds were more likely to obey the rule. (Frohlich et al. 2023) Indeed, Allen himself hypothesised that larger birds would be more likely to follow his rule. (Frohlich et al. 2023) The vastly different masses of Remizidae and Musophagidae birds support this. Additionally, Xu et al. found that passerines (Remizidae) exhibit a negative trend with annual mean temperature, while non-passerines (Musophagidae) exhibit a positive trend for bill and tarsus length. (Xu 2023) It is possible, then, that wing length is under a similar selection pressure to that producing these trends in tarsus length.
 
 ```{r fig.width=10}
 
-correlations_significant = filter(correlations_modified,p_value<0.05)
+correlations_significant = filter(correlations_p_r_values,p_value<0.05)
 
-max(correlations_significant)
-
-ggplot(correlations_significant, aes(x=trait_r, y=r_value, color=trait_r)) +
+ggplot(correlations_significant, aes(x=Trait, y=r_value, color=Trait)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
   geom_violin() +
   geom_jitter(size=0.5, alpha=0.5, width = 0.1) +
@@ -301,74 +251,82 @@ ggplot(correlations_significant, aes(x=trait_r, y=r_value, color=trait_r)) +
   labs(x = "Trait r values", y = "Distributions", title = "Distribution of r values of trait/temperature correlations across families")
 
 extreme_family_finder <- function(correlations,trait) {
-  p_values = paste("p_value_",trait,sep = "")
-  r_values = paste("r_value_",trait,sep = "")
-  
-  trait_significant_correlations = correlations %>%
-    select(Family3,!!sym(p_values),!!sym(r_values)) %>%
-    filter(!!sym(p_values)<0.05)
-  
-  most_negative = trait_significant_correlations %>%
-    arrange(!!sym(r_values)) %>%
+  trait_correlations = filter(correlations_significant,Trait==trait)
+
+  most_negative = trait_correlations %>%
+    arrange(r_value) %>%
     slice(1)
-  
-  most_positive = trait_significant_correlations %>%
-    arrange(desc(!!sym(r_values))) %>%
+
+  most_positive = trait_correlations %>%
+    arrange(desc(r_value)) %>%
     slice(1)
-  
+
   print(most_negative)
   print(most_positive)
 }
 
-extreme_family_finder(correlation_values,"Wing_Length")
+extreme_family_finder(correlations_significant,"Wing_Length")
 
-extreme_family_finder(correlation_values,"Kipps_dist")
+extreme_family_finder(correlations_significant,"Kipps_dist")
 
-extreme_family_finder(correlation_values,"Tail_Length")
+extreme_family_finder(correlations_significant,"Tail_Length")
 
-extreme_family_finder(correlation_values,"Hand_Wing_Index")
+extreme_family_finder(correlations_significant,"Hand_Wing_Index")
 
-# Remizidae_data = filter(avonet,Family3=="Remizidae")
-# Remizidae_lm = lm(data = Remizidae_data, Kipps.Distance ~ mean_annual_temp)
-# summary(Remizidae_lm)
-# 
-# ggplot(Remizidae_data, aes(x = mean_annual_temp, y = Kipps.Distance)) +
-#   scale_y_log10() +
-#   geom_point(size = 0.01) +
-#   geom_smooth(method = 'lm')
+print(arrange(filter(correlations_p_r_values,Trait=="Hand_Wing_Index"),r_value))
 
-# Musophagidae_data = filter(avonet,Family3=="Musophagidae")
-# Musophagidae_lm = lm(data = Musophagidae_data, Hand.Wing.Index ~ mean_annual_temp)
-# summary(Musophagidae_lm)
-# 
-# nrow(Musophagidae_data)
-# 
-# ggplot(Musophagidae_data, aes(x = mean_annual_temp, y = Hand.Wing.Index)) +
-#   scale_y_log10() +
-#   geom_point(size = 0.01) +
-#   geom_smooth(method = 'lm')
+mean(filter(avonet,Family3=="Remizidae")$Mass)
+mean(filter(avonet,Family3=="Musophagidae")$Mass)
 
 ```
 
+
+This theory was examined in the plot below, where r values for a given trait are plotted against the corresponding mean mass for the same family. While the minimum mass value has a lower r value than the maximum for most traits, a clear positive trend is not seen in any of the traits. This indicates the likely presence of various confounding effects, reflecting the various dimensions and environmental selection pressures on Wing and Tail dimensions.
+
+
+```{r}
+
+mean_mass_per_family <- avonet %>%
+  group_by(Family3) %>%
+  summarize(mean_mass = mean(Mass, na.rm = TRUE))
+
+correlations_significant <- correlations_significant %>%
+  left_join(mean_mass_per_family, by = "Family3")
+
+ggplot(correlations_significant, aes(x = mean_mass, y = r_value, colour = Trait)) +
+  geom_point() +
+  geom_line() +
+  scale_x_log10() +
+  geom_smooth(method = "lm", se = TRUE) +
+  facet_wrap(~ Trait) +
+  labs(x = "X-axis", y = "Y-axis")
+  theme_minimal()
+  
+```
 
 
 
 
 # References
 
+Allen, JA 1907, ‘The Influence of Physical Conditions in the Genesis of Species’, Scientific American, vol. 63, no. 1636supp, pp. 26217–26219.
+
+Baldwin, JW, Garcia‐Porta, J & Botero, CA 2023, ‘Complementarity in Allen’s and Bergmann’s rules among birds’, Nature Communications, vol. 14, Nature Portfolio, no. 1.
+
+Claramunt, S 2021, ‘Flight efficiency explains differences in natal dispersal distances in birds’, Ecology, vol. 102, no. 9.
+
 Fick, S.E. and R.J. Hijmans, 2017, 'WorldClim 2: new 1km spatial resolution climate surfaces for global land areas', International Journal of Climatology, vol. 37, no. 12, pp. 4302-4315.
 
-for the compare_df_cols function in the janitor package: https://stackoverflow.com/questions/53264993/comparing-column-names-in-r-across-various-data-frames
+Frӧhlich, A, Kotowska, D, Martyka, R & Symonds, MRE 2023, ‘Allometry reveals trade-offs between Bergmann’s and Allen’s rules, and different avian adaptive strategies for thermoregulation’, Nature Communications, vol. 14, no. 1.
 
+Sheard, C, Neate-Clegg, MHC, Alioravainen, N, Jones, SEI, Vincent, C, MacGregor, HEA, Bregman, TP, Claramunt, S & Tobias, JA 2020, ‘Ecological drivers of global gradients in avian dispersal inferred from wing morphology’, Nature Communications, vol. 11, no. 1.
 
+Symonds, Matthew R  E. & Tattersall, Glenn J 2010, ‘Geographical Variation in Bill Size across Bird Species Provides Evidence for Allen’s Rule’, The American Naturalist, vol. 176, no. 2, pp. 188–197.
 
+Tian, L & Benton, MJ 2020, ‘Predicting biotic responses to future climate warming with classic ecogeographic rules’, Current Biology, vol. 30, no. 13, pp. R744–R749.
 
+Tobias, JA, Sheard, C, Pigot, AL, Devenish, AJM, Yang, J, Sayol, F, Neate‐Clegg, MHC, Alioravainen, N, Weeks, TL, Barber, RA, Walkden, PA, ... Claramunt, S & Darski, B 2022, ‘AVONET: morphological, ecological and geographical data for all birds’, in T Coulson (ed.), Ecology Letters, vol. 25, no. 3, pp. 581–597.
 
+Weeks, B., Harvey, C., Tobias, J.A., Sheard, C., Zhou, Z., Fouhey, D.F., 2023, 'Skeletal morphology of bird wings is determined by thermoregulatory demand for heat dissipation in warmer climates', In Manuscript.
 
-
-
-
-
-
-
-
+Xu, Y, Price, ML, Que, P, Zhang, K, Shang, S, He, X, Wen, Z & Wang, B 2023, ‘Ecological predictors of interspecific variation in bird bill and leg lengths on a global scale’, Proceedings of The Royal Society B: Biological Sciences, vol. 290, Royal Society, no. 2003.
