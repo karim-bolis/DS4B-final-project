@@ -41,6 +41,7 @@ Download the file named "AVONET from Supplementary dataset 1.xlsx" from https://
 WorldClim data is downloaded below.
 
 ```{r}
+library(raster)
 library(readxl)
 
 worldclim = getData("worldclim",var="bio",res=2.5, path="raw_data")
@@ -48,12 +49,6 @@ worldclim = getData("worldclim",var="bio",res=2.5, path="raw_data")
 ```
 
 # Data wrangling
-
-
-                                 USE STYLR ON CODE FOR READABILITY AND ADDRESS FEEDBACK FROM SHORT REPORT 1
-
-
-
 
 ```{r}
 library(tidyverse)
@@ -67,7 +62,8 @@ avonet = avonet %>%
   mutate(Max.Latitude=as.double(Max.Latitude)) %>%
   mutate(Centroid.Latitude=as.double(Centroid.Latitude)) %>%
   mutate(Centroid.Longitude=as.double(Centroid.Longitude)) %>%
-  mutate(Range.Size=as.double(Range.Size))
+  mutate(Range.Size=as.double(Range.Size)) %>%
+  mutate(Hand.Wing.Index=`Hand-Wing.Index`)
 
 write_csv(avonet, file = "processed_data/tidied_data.csv")
 
@@ -84,155 +80,133 @@ avonet <- read_csv("processed_data/cleaned_data.csv")
 
 # Sanity checks
 
+Most of the sanity checking was done in the data cleaning document. These extra checks ensure that data types are consistent with how they appear, that all species have location information to find their living range mean annual temperature and that none of the traits studied have been inferred from close relatives.
+
 ```{r}
 
+summary(avonet)
 
-check that there aren't any NA values in the centroids for example, etc.
+any(is.na(avonet$Centroid.Latitude))
+any(is.na(avonet$Centroid.Longitude))
+
+unique(avonet$Traits.inferred)
 
 ```
 
-
-[R chunks and prose which perform sanity checks on your cleaned data]
-[Remember that this really just summarises that your data are OK after you've cleaned them]
-[Most of the real sanity checks and data cleaning go on in the data_cleaning.Rmd file]
-
-# Does Allen's rule apply to...
+                                                # Does Allen's rule apply to...
 
 
-[Use appropriate sub-headings]
+                                              [Use appropriate sub-headings]
+# Report
 
 ## Introduction
 
-As the climate gets hotter, ornithologists have found that birds tend to get smaller. This is consistent with one of ecology's oldest rules: Bergmann's rule. It states that in hotter climates, body sizes tend to shrink, as the increase in surface-area-to-volume ratio results in more heat exchange with the environment and better heat loss.
 
-```{r}
+As the climate gets hotter, ornithologists have found shifts in bird sizes, geographic ranges and phenology. (Tian & Benton 2020, Baldwin et al. 2023) This has sparked an interest in predicting future shifts using biogeographical rules which summarise large global trends. (Tian & Benton 2020) Allen's rule, one of the oldest ones, states that in hotter climates, endotherm appendages tend to become larger, as the increase in surface-area-to-volume ratio results in more heat exchange with the environment. (Allen 1877) Allen's rule has been studied extensively, often in conjunction with Bergmann's rule, which links body size with temperature. (Xu 2023, Symonds & Tattersall 2010,  Fohlich et al. 2023, Baldwin et al. 2023) Yet, published literature has only looked into bird beak dimensions and tarsus (foot) length as appendage size representatives, often neglecting wings and tails. The presence of feathering on these appendages may complicate results. During flight, birds lose 99% of the heat generated, mostly through their wings, yet heat conservation is also achieved by holding the wings close to one's torso (Weeks et al. 2023). Similarly, beaks are simultaneously involved in both heat dissipation and cold tolerance (Weeks et al. 2023) This study aims to understand how Wing and Tail Length factor into Allen's rule across the world's species.
 
+## Obtaining annual temperature
 
-
-```
-
-
-Finding the mean annual temperature from a lat/long
-
-mention that the temperature is multiplied by 10
+World Mean annual temperature data was downloaded from WorldClim above, who store data from 1970-2000 for the whole world. Using the raster package function "extract", I found the temperature for every lat/long spatial point representing the centre of a species living range. I filtered out species with no temperature as a result of their living range being too remote for data collection.
 
 ```{r}
 library(raster)
 library(sp)
 
 worldclim <- worldclim[[1]]
-# names(r) <- "Temp"
-# plot(r)
+plot(worldclim)
 
-# Extract temperature value at the specified lat/long
 get_mean_annual_temp <- function(climate_data, lat, long) {
   point = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = climate_data@crs)
   return(raster::extract(climate_data, point))
 }
-
 
 avonet = avonet %>%
   mutate(mean_annual_temp = get_mean_annual_temp(worldclim, Centroid.Latitude, Centroid.Longitude)/10)
 
 avonet = filter(avonet, !is.na(mean_annual_temp))
 
+# check temperature data was added
 head(avonet)
 
 ```
 
+## PCA
 
+The distributions of wing and tail length seen in the violin plot show that while most values sit within a small range for both, there is a lot of outliers. Graphing them shows they have a linear relationship with narrow confidence intervals. To quantify the effect size, I found their pearson and spearman correlation coefficients. While both coefficients assume a linear relationship, pearson is heavily affected by outliers, so spearman performs better.
 
-FIRST START BY DIVIDING INTO FAMILIES, READ UP ON THIS.
+This strong relationship indicates that a Principal component analysis, which reduces data dimensionality, could provide a way to capture both sets of data and provide a stronger correlate with mean annual temperature. This technique was previously used to capture bill size from its 4 dimensional measurments. (Baldwin et al. 2023) The first principal component, capturing 86% of both variables, was added to avonet.
 
-checking the relationship between wing length and secondary length. We hypothesise it would be linear, and that the distributions do not contain too many outliers.
-boxplots to find if pearson's coefficient is the more useful one, to check outliers basically.
-
-boxplot showed many outliers, so spearman may be better since pearson is affected by outliers, but clear linear correlation with extremely small confidence interval shows pearson may be better. Correlation coefficients show pearson is slightly better, but both are high
-
-So the aim here is to have a single, composite metric that captures the variation in the metrics of wing length and secondary length. We know the two measurements are highly correlated, so in theory the first principal component should capture a large amount of the data
-
-after we get PC1, we want to put it back into the data. Thankfully, vectors are ordered, so we can just put it back into avonet
-
-basically start by saying that the hypothesis is that measurments 6 and 7 would correlate strongly so would be more powerful in a PCA than alone, but the other ones like HWI, Kipp's distance and Tail Length may not correlate to each other as much
-
-
-pearson assumptions: 
-The relationship between X and Y is linear.
-The frequency distributions of X and Y separately are normal.
-
-spearman assumptions:
-linear relationship
 ```{r}
 library(psych)
 
 summary(avonet$Wing.Length)
-summary(avonet$Secondary1)
-
-# Create side-by-side box plots
-ggplot(avonet, aes(x = 1, y = Wing.Length)) +
-  geom_boxplot(width = 0.2, fill = "blue") +
-  labs(y = "Value") +
-  labs(x = "Distributions") +
-  geom_boxplot(data = avonet, aes(x = 2, y = Secondary1), width = 0.2, fill = "red") +
-  scale_x_continuous(breaks = c(1, 2), labels = c("Wing Length", "Secondary Length"))
+summary(avonet$Tail.Length)
 
 ggplot(avonet, aes(x = 1, y = Wing.Length)) +
   geom_violin(fill = "blue") +
   labs(y = "Trait Value") +
-  theme_minimal() +
   labs(x = "Distributions") +
-  geom_violin(data = avonet, aes(x = 2, y = Secondary1), fill = "red") +
-  theme_minimal() +
-  scale_x_continuous(breaks = c(1, 2), labels = c("Wing Length", "Secondary Length"))
+  geom_violin(data = avonet, aes(x = 2, y = Tail.Length), fill = "red") +
+  scale_x_continuous(breaks = c(1, 2), labels = c("Wing Length", "Tail Length"))
 
-ggplot(avonet, aes(x = Wing.Length, y = Secondary1)) +
+ggplot(avonet, aes(x = Wing.Length, y = Tail.Length)) +
   geom_point(size = 0.01) +
+  scale_y_log10() +
   geom_smooth(method = 'lm', se=TRUE, level=0.99999999)
 
-correlation_value_pearson = cor(avonet$Wing.Length, avonet$Secondary1, method = "pearson")
-correlation_value_spearman = cor(avonet$Wing.Length, avonet$Secondary1, method = "spearman")
+correlation_value_pearson = cor(avonet$Wing.Length, avonet$Tail.Length, method = "pearson")
+correlation_value_spearman = cor(avonet$Wing.Length, avonet$Tail.Length, method = "spearman")
 print(correlation_value_pearson)
 print(correlation_value_spearman)
 
-
-pca_model = principal(select(avonet,Wing.Length,Secondary1), nfactors = 2, rotate='none')
+pca_model = principal(select(avonet,Wing.Length,Tail.Length), nfactors = 2, rotate='none')
 summary(pca_model)
-print(pca_model)
 
 pc1 = pca_model$scores[,1]
 
-head(avonet$Wing.Length)
-head(avonet$Secondary1)
-head(pc1)
-
-avonet$wing_pc1 = pc1
+avonet$wing_tail_pc1 = pc1
 
 head(avonet)
 
 
 ```
 
+## Correlations
+
+I chose to study family-level correlations, as families usually contain a sufficiently large temperature range and number of species, keeping potentially confounding effects of morphology, behavior, and ecology variation low. Additionally, families have vastly different trait value distributions, as seen in the histograms. The families studied were filtered to favor a temperature range and no. of species > 10. Initial results surprisingly showed that both wing and tail length negatively correlated with temperature across the data, with varying significance. To dig deeper, I first found the distribution of p values across families for each trait using boxplots. This showed that most relationships are not significant for the traits, with only the Hand-Wing Index median falling at or below the 0.05 threshold. While the significant relationship counts featured some for all traits, Tail Length, The Hand-Wing Index (HWI) and Kipps Distance contained the most. The PC1 from the Wing/Tail Length PCA seems to show a correlation between the two traits, rather than improving on them.
+
+The HWI is a metric of flight efficiency and ability to disperse in birds (Tobias et al. 2021). It is equivalent to Kipps' length, explaining their similar numbers, and is not a measure of appendage length, more of relative ratios. (Sheard et al. 2020) Research has suggested that tropical species in hotter climates have less dispersal ability, increasing their sensitivity to habitat disturbance. (Sheard et al. 2020) This fits the trend shown here.
+Assessing the families with the most correlation (by correlation coefficient) for the highly correlated traits shows that the  Remizidae family consistently shows the clearest negative trend between mean annual temperature and wing length, HWI, Kipps' distance and Tail Length, in some cases showing a correlation that explains 77% of the trait's variation through the mean annual temperature (r=-0.88^2 --> R=0.77).
 
 
 
 
+frohlich said the trend reverses in smaller birds, and that's what I found!!
 
 
-normal correlation
 
-I suppose one of the reasons the PC1 didn't end up bein that strong a predictor could be the presence of many outliers in the data, which can skew the results. but i didnt use spearman or pearson to do the pca so dont say that, I think chatgpt made that stuff up. you know what, it's probably because the correlation of the secondary length by itself is so bad, so it drags down that of the Wing Length. 
 
-SO BASED ON THIS ^ MAYBE TRY PCA WITH THE ONES THAT DO HAVE A GOOD CORRELATION
+Ecological predictors of interspecific variation in bird bill and leg lengths on a global scale: they found opposite effects in passerines vs non-passerines in bird dimensions
 
 ```{r}
+Anatidae_Tyrannidae <- avonet %>%
+  filter(Family3 %in% c("Anatidae", "Tyrannidae"))
+
+ggplot(Anatidae_Tyrannidae, aes(x = Wing.Length)) +
+  geom_histogram(fill = "blue", color = "black") +
+  facet_wrap(~Family3, ncol = 2) +
+  labs(x = "Wing Length", y = "Frequency") +
+  ggtitle("Histograms of PC1 Values for Anatidae and Tyrannidae")
+
+
+
+
 
 avonet = avonet %>%
   group_by(Family3) %>%
   mutate(temp_range=max(mean_annual_temp)-min(mean_annual_temp))
 
-nrow(avonet)
 avonet = filter(avonet,temp_range>10)
-nrow(avonet)
 
 avonet = avonet %>%
   group_by(Family3) %>%
@@ -240,243 +214,195 @@ avonet = avonet %>%
 
 avonet = filter(avonet,no_species_in_family>10)
 
-Anatidae_Tyrannidae <- avonet %>%
-  filter(Family3 %in% c("Anatidae", "Tyrannidae"))
-
-ggplot(Anatidae_Tyrannidae, aes(x = wing_pc1)) +
-  geom_histogram(binwidth = 0.2, fill = "blue", color = "black", alpha = 0.7) +
-  facet_wrap(~Family3, ncol = 2) +
-  labs(x = "Wing_PC1", y = "Frequency") +
-  ggtitle("Histograms of PC1 Values for Anatidae and Tyrannidae")
 
 
-
-ggplot(avonet, aes(x = mean_annual_temp, y = Mass)) +
-  scale_y_log10() +
-  geom_point(size = 0.01) +
-  geom_smooth(method = 'lm')
-
-ggplot(avonet, aes(x = mean_annual_temp, y = Kipps.Distance)) +
-  scale_y_log10() +
-  geom_point(size = 0.01) +
-  geom_smooth(method = 'lm')
-
-ggplot(avonet, aes(x = `Hand-Wing.Index`, y = Kipps.Distance)) +
-  geom_point(size = 0.01) +
-  geom_smooth(method = 'lm')
-
-ggplot(avonet, aes(x = Wing.Length, y = Secondary1)) +
-  geom_point(size = 0.01) +
-  geom_smooth(method = 'lm')
 
 
 cat("Wing Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Wing.Length)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Wing.Length),"\n")
 
-cat("Secondary Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Secondary1)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Secondary1),"\n")
-
-cat("Wing PC1 p-value:",cor.test(avonet$mean_annual_temp,avonet$wing_pc1)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$wing_pc1),"\n")
-
-cat("Hand-Wing Index p-value:",cor.test(avonet$mean_annual_temp,avonet$`Hand-Wing.Index`)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$`Hand-Wing.Index`),"\n")
-
-cat("Kipps Distance p-value:",cor.test(avonet$mean_annual_temp,avonet$Kipps.Distance)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Kipps.Distance),"\n")
-
 cat("Tail Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Tail.Length)$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Tail.Length),"\n")
 
-correlation_p_values_pearson <- avonet %>%
+ggplot(avonet, aes(x = mean_annual_temp, y = Wing.Length)) +
+  scale_y_log10() +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm') +
+  labs(title = "Correlation of Wing Length & Mean Annual Temperature across all families") +
+  theme(plot.title = element_text(size = 12))
+
+ggplot(avonet, aes(x = mean_annual_temp, y = Tail.Length)) +
+  scale_y_log10() +
+  geom_point(size = 0.01) +
+  geom_smooth(method = 'lm') +
+  labs(title = "Correlation of Tail Length & Mean Annual Temperature across all families") +
+  theme(plot.title = element_text(size = 12))
+
+correlation_values <- avonet %>%
   group_by(Family3) %>%
   summarize(
     p_value_Wing_Length = cor.test(mean_annual_temp, Wing.Length)$p.value,
     r_value_Wing_Length = cor(mean_annual_temp, Wing.Length),
-    p_value_Secondary1 = cor.test(mean_annual_temp, Secondary1)$p.value,
-    r_value_Secondary1 = cor(mean_annual_temp, Wing.Length),
-    p_value_wing_pc1 = cor.test(mean_annual_temp, wing_pc1)$p.value,
-    r_value_wing_pc1 = cor(mean_annual_temp, Wing.Length),
-    p_value_Hand_Wing_Index = cor.test(mean_annual_temp, `Hand-Wing.Index`)$p.value,
-    r_value_Hand_Wing_Index = cor(mean_annual_temp, Wing.Length),
-    p_value_Kipps_dist = cor.test(mean_annual_temp, Kipps.Distance)$p.value,
-    r_value_Kipps_dist = cor(mean_annual_temp, Wing.Length),
     p_value_Tail_Length = cor.test(mean_annual_temp, Tail.Length)$p.value,
-    r_value_Tail_Length = cor(mean_annual_temp, Wing.Length)
+    r_value_Tail_Length = cor(mean_annual_temp, Tail.Length),
+    p_value_wing_tail_pc1 = cor.test(mean_annual_temp, wing_tail_pc1)$p.value,
+    r_value_wing_tail_pc1 = cor(mean_annual_temp, wing_tail_pc1),
+    p_value_Secondary1 = cor.test(mean_annual_temp, Secondary1)$p.value,
+    r_value_Secondary1 = cor(mean_annual_temp, Secondary1),
+    p_value_Hand_Wing_Index = cor.test(mean_annual_temp, Hand.Wing.Index)$p.value,
+    r_value_Hand_Wing_Index = cor(mean_annual_temp, Hand.Wing.Index),
+    p_value_Kipps_dist = cor.test(mean_annual_temp, Kipps.Distance)$p.value,
+    r_value_Kipps_dist = cor(mean_annual_temp, Kipps.Distance)
   ) %>%
   ungroup()
 
-# Spearman
-cat("Wing Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Wing.Length,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Wing.Length),"\n")
+head(correlation_values)
 
-cat("Secondary Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Secondary1,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Secondary1),"\n")
+summary(correlation_values)
 
-cat("Wing PC1 p-value:",cor.test(avonet$mean_annual_temp,avonet$wing_pc1,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$wing_pc1),"\n")
 
-cat("Hand-Wing Index p-value:",cor.test(avonet$mean_annual_temp,avonet$`Hand-Wing.Index`,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$`Hand-Wing.Index`),"\n")
-
-cat("Kipps Distance p-value:",cor.test(avonet$mean_annual_temp,avonet$Kipps.Distance,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Kipps.Distance),"\n")
-
-cat("Tail Length p-value:",cor.test(avonet$mean_annual_temp,avonet$Tail.Length,method = "spearman")$p.value,"correlation coefficient:",cor(avonet$mean_annual_temp,avonet$Tail.Length),"\n")
-
-correlation_p_values_spearman <- avonet %>%
-  group_by(Family3) %>%
-  summarize(
-    p_value_Wing_Length = cor.test(mean_annual_temp, Wing.Length, method = "spearman")$p.value,
-    p_value_Secondary1 = cor.test(mean_annual_temp, Secondary1, method = "spearman")$p.value,
-    p_value_wing_pc1 = cor.test(mean_annual_temp, wing_pc1,  method = "spearman")$p.value,
-    p_value_Hand_Wing_Index = cor.test(mean_annual_temp, `Hand-Wing.Index`, method = "spearman")$p.value,
-    p_value_Kipps_dist = cor.test(mean_annual_temp, Kipps.Distance, method = "spearman")$p.value,
-    p_value_Tail_Length = cor.test(mean_annual_temp, Tail.Length, method = "spearman")$p.value
+correlations_modified <- correlation_values %>%
+  pivot_longer(
+    cols = starts_with("p_value_"),
+    names_to = "trait_p",
+    values_to = "p_value"
   ) %>%
-  ungroup()
+  pivot_longer(
+    cols = starts_with("r_value_"),
+    names_to = "trait_r",
+    values_to = "r_value"
+  )
+
+
+head(correlations_modified)
 
 
 
+ggplot(correlations_modified, aes(x=trait_p, y=p_value)) +
+  geom_boxplot()
 
-
-
-
-
-
-# correlations_modified <- correlation_p_values_pearson %>%
-#   pivot_longer(
-#     cols = starts_with("p_value_"),
-#     names_to = "trait",
-#     values_to = "p_value"
-#   )
-# 
-# ggplot(correlations_modified, aes(x = p_value, y = Family3, color = trait)) +
-#   geom_point(size = 3) +
-#   geom_vline(xintercept = 0.5, linetype = "dashed") +
-#   theme_minimal() +
-#   labs(
-#     x = "p-value",
-#     y = "Family",
-#     title = "Comparison of p-values for Different Families and Traits"
-#   ) +
-#   scale_color_manual(
-#     values = c("p_value_Wing_Length" = "red", "p_value_Secondary1" = "blue", "p_value_wing_pc1" = "green"),
-#     labels = c("Wing.Length", "Secondary1", "wing_pc1")
-#   ) +
-#   guides(color = guide_legend(title = "Traits"))
-# 
-
-
-
-
-
-
-
-ggplot(correlation_p_values_pearson, aes(x = 1, y = p_value_Wing_Length)) +
+ggplot(correlation_values, aes(x = 1, y = p_value_Wing_Length)) +
   geom_boxplot(fill = "blue") +
   labs(y = "Trait p-values") +
   labs(x = "Distributions") +
-  geom_boxplot(data = correlation_p_values_pearson, aes(x = 2, y = p_value_Secondary1), fill = "red") +
-  geom_boxplot(data = correlation_p_values_pearson, aes(x = 3, y = p_value_wing_pc1), fill = "green") +
-  geom_boxplot(data = correlation_p_values_pearson, aes(x = 4, y = p_value_Hand_Wing_Index), fill = "purple") +
-  geom_boxplot(data = correlation_p_values_pearson, aes(x = 5, y = p_value_Kipps_dist), fill = "yellow") +
-  geom_boxplot(data = correlation_p_values_pearson, aes(x = 6, y = p_value_Tail_Length), fill = "black") +
+  geom_boxplot(data = correlation_values, aes(x = 2, y = p_value_Tail_Length), fill = "black") +
+  geom_boxplot(data = correlation_values, aes(x = 3, y = p_value_wing_tail_pc1), fill = "green") +
+  geom_boxplot(data = correlation_values, aes(x = 4, y = p_value_Secondary1), fill = "red") +
+  geom_boxplot(data = correlation_values, aes(x = 5, y = p_value_Hand_Wing_Index), fill = "purple") +
+  geom_boxplot(data = correlation_values, aes(x = 6, y = p_value_Kipps_dist), fill = "yellow") +
   geom_hline(yintercept = 0.05, linetype = "dashed") +
-  scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6), labels = c("Wing Length","Secondary Length","Wing PC1","Hand-Wing Index", "Kipps Distance", "Tail Length"))
+  scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6), labels = c("Wing Length","Tail Length","Wing Tail PC1","Secondary Length", "Hand-Wing Index", "Kipps Distance")) +
+  labs(title = "Distribution of P values of trait/temperature correlations across families") +
+  theme(plot.title = element_text(size = 12))
+
+
+# ggplot(correlation_values, aes(x = 1, y = r_value_Wing_Length)) +
+#   geom_boxplot(fill = "blue") +
+#   geom_point(fill = "blue") +
+#   labs(y = "Trait r-values") +
+#   labs(x = "Distributions") +
+#   geom_boxplot(data = correlation_values, aes(x = 2, y = r_value_Tail_Length), fill = "black") +
+#   
+#   geom_boxplot(data = correlation_values, aes(x = 3, y = r_value_wing_tail_pc1), fill = "green") +
+#   geom_boxplot(data = correlation_values, aes(x = 4, y = r_value_Secondary1), fill = "red") +
+#   geom_boxplot(data = correlation_values, aes(x = 5, y = r_value_Hand_Wing_Index), fill = "purple") +
+#   geom_boxplot(data = correlation_values, aes(x = 6, y = r_value_Kipps_dist), fill = "yellow") +
+#   scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6), labels = c("Wing Length","Secondary Length","Wing Tail PC1","Hand-Wing Index", "Kipps Distance", "Tail Length")) +
+#   labs(title = "Distribution of r values of trait/temperature correlations across families") +
+#   theme(plot.title = element_text(size = 12))
+
+head(correlation_values)
+
+
+nrow(filter(correlation_values,p_value_Wing_Length<0.05))
+nrow(filter(correlation_values,p_value_Tail_Length<0.05))
+nrow(filter(correlation_values,p_value_wing_tail_pc1<0.05))
+nrow(filter(correlation_values,p_value_Secondary1<0.05))
+nrow(filter(correlation_values,p_value_Hand_Wing_Index<0.05))
+nrow(filter(correlation_values,p_value_Kipps_dist<0.05))
+
+head(correlation_values)
+
+# ggplot(correlation_values, aes(x=flowcell, y=total_output_MB, colour=flowcell)) +
+#   geom_violin() +
+#   geom_jitter(size=0.5, alpha=0.5, width = 0.1) + 
+#   theme_minimal()
 
 
 
-ggplot(correlation_p_values_spearman, aes(x = 1, y = p_value_Wing_Length)) +
-  geom_boxplot(fill = "blue") +
-  labs(y = "Trait p-values") +
-  labs(x = "Distributions") +
-  geom_boxplot(data = correlation_p_values_spearman, aes(x = 2, y = p_value_Secondary1), fill = "red") +
-  geom_boxplot(data = correlation_p_values_spearman, aes(x = 3, y = p_value_wing_pc1), fill = "green") +
-  geom_boxplot(data = correlation_p_values_spearman, aes(x = 4, y = p_value_Hand_Wing_Index), fill = "purple") +
-  geom_boxplot(data = correlation_p_values_spearman, aes(x = 5, y = p_value_Kipps_dist), fill = "yellow") +
-  geom_boxplot(data = correlation_p_values_spearman, aes(x = 6, y = p_value_Tail_Length), fill = "black") +
-  geom_hline(yintercept = 0.05, linetype = "dashed") +
-  scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6), labels = c("Wing Length","Secondary Length","Wing PC1","Hand-Wing Index", "Kipps Distance", "Tail Length"))
-
-head(correlation_p_values_pearson)
-head(correlation_p_values_spearman)
-
-nrow(filter(correlation_p_values_pearson,p_value_Wing_Length<0.05))
-nrow(filter(correlation_p_values_pearson,p_value_Secondary1<0.05))
-nrow(filter(correlation_p_values_pearson,p_value_wing_pc1<0.05))
-nrow(filter(correlation_p_values_pearson,p_value_Hand_Wing_Index<0.05))
-nrow(filter(correlation_p_values_pearson,p_value_Kipps_dist<0.05))
-nrow(filter(correlation_p_values_pearson,p_value_Tail_Length<0.05))
-
-nrow(filter(correlation_p_values_spearman,p_value_Wing_Length<0.05))
-nrow(filter(correlation_p_values_spearman,p_value_Secondary1<0.05))
-nrow(filter(correlation_p_values_spearman,p_value_wing_pc1<0.05))
-nrow(filter(correlation_p_values_spearman,p_value_Hand_Wing_Index<0.05))
-nrow(filter(correlation_p_values_spearman,p_value_Kipps_dist<0.05))
-nrow(filter(correlation_p_values_spearman,p_value_Tail_Length<0.05))
 
 
-HWI_significant_correlations = correlation_p_values_pearson %>%
-  select(Family3,p_value_Hand_Wing_Index,r_value_Hand_Wing_Index) %>%
-  filter(p_value_Hand_Wing_Index<0.05)
 
-summary(HWI_significant_correlations)
 
-most_negative_family = HWI_significant_correlations %>%
-  arrange(r_value_Hand_Wing_Index) %>%
-  slice(1)
 
-print(most_negative_family)
 
+
+
+
+
+
+
+
+
+
+
+
+
+extreme_family_finder <- function(correlations,trait) {
+  p_values = paste("p_value_",trait,sep = "")
+  r_values = paste("r_value_",trait,sep = "")
+  
+  trait_significant_correlations = correlations %>%
+    select(Family3,!!sym(p_values),!!sym(r_values)) %>%
+    filter(!!sym(p_values)<0.05)
+  
+  most_negative = trait_significant_correlations %>%
+    arrange(!!sym(r_values)) %>%
+    slice(1)
+  
+  most_positive = trait_significant_correlations %>%
+    arrange(desc(!!sym(r_values))) %>%
+    slice(1)
+  
+  print(most_negative)
+  print(most_positive)
+}
+
+
+
+# Examining Wing Length
+extreme_family_finder(correlation_values,"Wing_Length")
+
+# Examining Kipps Distance
+extreme_family_finder(correlation_values,"Kipps_dist")
+
+# Examining Tail Length
+extreme_family_finder(correlation_values,"Tail_Length")
+
+# Examining HWI
+extreme_family_finder(correlation_values,"Hand_Wing_Index")
 
 Remizidae_data = filter(avonet,Family3=="Remizidae")
-Remizidae_lm = lm(data = Remizidae_data, `Hand-Wing.Index` ~ mean_annual_temp)
+Remizidae_lm = lm(data = Remizidae_data, Hand.Wing.Index ~ mean_annual_temp)
 summary(Remizidae_lm)
 
 nrow(Remizidae_data)
 
-ggplot(Remizidae_data, aes(x = mean_annual_temp, y = `Hand-Wing.Index`)) +
+ggplot(Remizidae_data, aes(x = mean_annual_temp, y = Hand.Wing.Index)) +
   scale_y_log10() +
   geom_point(size = 0.01) +
   geom_smooth(method = 'lm')
 
-
-
-
-
-
-
-most_positive_family = HWI_significant_correlations %>%
-  arrange(desc(r_value_Hand_Wing_Index)) %>%
-  slice(1)
-
-print(most_positive_family)
-
-Musophagidae_data = filter(avonet,Family3=="Musophagidae")
-Musophagidae_lm = lm(data = Musophagidae_data, `Hand-Wing.Index` ~ mean_annual_temp)
-summary(Musophagidae_lm)
-
-nrow(Musophagidae_data)
-
-ggplot(Musophagidae_data, aes(x = mean_annual_temp, y = `Hand-Wing.Index`)) +
-  scale_y_log10() +
-  geom_point(size = 0.01) +
-  geom_smooth(method = 'lm')
-
-
-# significant_family_means = avonet %>%
-#   filter(Family3 %in% HWI_significant_correlations$Family3) %>%
-#   select(Family3,`Hand-Wing.Index`) %>%
-#   mutate(HWI_mean)
-#   
+# Musophagidae_data = filter(avonet,Family3=="Musophagidae")
+# Musophagidae_lm = lm(data = Musophagidae_data, Hand.Wing.Index ~ mean_annual_temp)
+# summary(Musophagidae_lm)
+# 
+# nrow(Musophagidae_data)
+# 
+# ggplot(Musophagidae_data, aes(x = mean_annual_temp, y = Hand.Wing.Index)) +
+#   scale_y_log10() +
+#   geom_point(size = 0.01) +
+#   geom_smooth(method = 'lm')
 
 ```
-
-Explaining why Remizidae species experience a strong negative correlation between warm temperatures and HWI.
-
-First look into if HWI is actually a good proxy for appendage size. the formula is rather complicated
-
-find situations where allens rule was the opposite in literature
-
-```{r}
-
-```
-
-
-
-
-
-
 
 
 
@@ -495,124 +421,7 @@ Tobias, J. A., Sheard, C., Pigot, A. L., Devenish, A. J. M., Yang, J., Sayol, F.
 
 for the compare_df_cols function in the janitor package: https://stackoverflow.com/questions/53264993/comparing-column-names-in-r-across-various-data-frames
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-EXTRA CODE
-
-# red list idea
-```{r}
-library(tidyverse)
-# remotes::install_github("traitecoevo/austraits")
-
-#remotes::install_github("guillembagaria/ggbiome")
-
-```
-
-# austraits
-
-```{r}
-library(austraits)
-austraits = load_austraits(version="4.1.0")
-
-austraits_species_list <- unique(austraits$traits$taxon_name)
-austraits_species_list = trimws(austraits_species_list)
-
-red_list_species = read_csv("data/redlist_species_data_37eb453b-68b3-42c2-8a5a-33fee5fffdbc/assessments.csv")
-
-typeof(red_list_species$scientificName)
-
-common_elements = austraits_species_list %in% red_list_species
-
-if (any(common_elements)) {
-  cat("The vectors have common elements:", vector1[common_elements], "\n")
-} else {
-  cat("No common elements found.\n")
-}
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Extra code for finding temperature data
-
-```{r}
-# setwd("data/wc2.1_10m_tavg")
-# 
-# months <- c("wc2.1_10m_tavg_01.tif", "wc2.1_10m_tavg_02.tif", "wc2.1_10m_tavg_03.tif", "wc2.1_10m_tavg_04.tif", "wc2.1_10m_tavg_05.tif", "wc2.1_10m_tavg_06.tif", "wc2.1_10m_tavg_07.tif", "wc2.1_10m_tavg_08.tif", "wc2.1_10m_tavg_09.tif", "wc2.1_10m_tavg_10.tif", "wc2.1_10m_tavg_11.tif", "wc2.1_10m_tavg_12.tif")
-# 
-# months_raster = lapply(months,raster)
-# 
-# get_mean_annual_temp <- function(raster_list, lat, long) {
-#   points = SpatialPoints(data.frame(longitude = long, latitude = lat), proj4string = raster_list[[1]]@crs)
-# 
-#   # Initialize an empty list to store extracted values
-#   extracted_values <- numeric(length(raster_list))
-# 
-#   # Loop through each raster in the list
-#   for (i in 1:length(raster_list)) {
-#     
-#     # Extract temperature value at the specified lat/long location
-#     extracted_value = raster::extract(raster_list[[i]], points)
-#     
-#     # Append extracted value to the list
-#     extracted_values[i] = extracted_value
-#   }
-#   
-#   # Return the list of extracted values (one value for each raster)
-#   return(mean(extracted_values))
-# }
-# 
-# mean_annual_temp = get_mean_annual_temp(months_raster,66,96)
-# print(mean_annual_temp)
-
-```
-
-
+Allen, J. A. (1877) The influence of physical conditions in the genesis of species, Radic. Rev. (Vol. 1, pp. 108–140.)
 
 
 

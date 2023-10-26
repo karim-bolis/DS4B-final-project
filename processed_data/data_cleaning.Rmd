@@ -26,9 +26,9 @@ Avonet is composed of an XLSX file with multiple sheets containing 3 main Avonet
 
 First I loaded the excel sheets containing the 3 Avonet datasets and converted them to tibbles. I then compared the column names between them to see if there's data in some that is missing in others. I can immediately exclude the ebird dataset because it has no centroid lat/long values, which indicate the midpoint of the species range. This is necessary to get the annual temperature data for the species' environment. The birdtree dataset also has species extinction status, which allows for correlating the extinction status with the likelihood of following biogeographical rules. I then compared the no. of individuals used in each dataset to find that birdtree had the most, so I chose birdtree as the primary database. This was reflected in the creation of the tidied_data file in the main document.
 
-I first filtered out all the species with less than 3 individuals for which measurements were taken for each morphometric trait. I hypothesised that a smaller sample size than 3 is not enough to ensure the species means are reflective of the entire population, especially if among those 3 individuals only 1 or 2 measurements were taken for my studied traits. I also excluded species with missing centroid values. Finally, I excluded species for which the Wing Length and Secondary Length were inferred from adjacent species, as this would make detecting the presence of a gradient for those traits across a family of species more difficult and could skew results. Finally, I removed duplicates in the excluded data.
+I first filtered out all the species with less than 3 individuals for which measurements were taken for each morphometric trait. I hypothesised that a smaller sample size than 3 is not enough to ensure the species means are reflective of the entire population, especially if among those 3 individuals only 1 or 2 measurements were taken for my studied traits. I also excluded species with missing centroid values. Finally, I excluded species for which the Wing Length, Kipps Distance, Secondary Length, Hand-Wing Index and Tail Length were inferred from adjacent species, as this would make detecting the presence of a gradient for those traits across a family of species more difficult and could skew results. Finally, I removed duplicates in the excluded data.
 
-Some sanity checks were then conducted, ensuring that column values were as expected. Based on the summary of the data, I investigated some of the outliers in the data, such as the species with the highest mass and beak length, by looking them up. Some additional checks were made i Excel to ensure values like the Species Status had values that were in line with the metadata.
+Some sanity checks were then conducted, ensuring that column values were as expected. Based on the summary of the data, I investigated some of the outliers, such as the species with the highest mass and beak length, by looking them up. Some additional checks were made in Excel to ensure values like the Species Status had values that were in line with the metadata.
 
 
 
@@ -71,7 +71,7 @@ to_exclude = avonet %>%
 excluded_data = bind_rows(excluded_data,to_exclude)
 
 to_exclude = avonet %>%
-  filter(str_detect(Traits.inferred, "Wing Length") | str_detect(Traits.inferred, "Secondary1")) %>%
+  filter(str_detect(Traits.inferred, "Wing Length") | str_detect(Traits.inferred, "Kipps' Distance") | str_detect(Traits.inferred, "Secondary1") | str_detect(Traits.inferred, "Hand-Wing Index") | str_detect(Traits.inferred, "Tail Length")) %>%
   mutate(
     date="19/10/23",
     exclusion_notes="Inferred traits may skew results when trying to detect patterns across adjacent species"
@@ -93,7 +93,6 @@ print(filter(avonet,Tail.Length==812.8))
 
 summary(avonet)
 
-# FILTER OUT ROWS THAT DON'T HAVE VALUES FOR THE TRAITS YOU WANT TO MEASURE
 
 # avonet_all_means_medians = avonet_all %>%
 #   group_by("Species3_BirdTree") %>%
