@@ -48,5 +48,4 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
-data
 raw_data/wc2-5

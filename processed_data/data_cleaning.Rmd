@@ -99,7 +99,6 @@ write_csv(excluded_data, file = "excluded_data.csv")
 ```
 
 
-
 # Extra Code
 
 This code is left here as supplementary information. It shows an attempt to run a Bayesian phylogenetic generalized linear mixed model (PGLMM). This model would have taken into account the phylogenetic history of the species being studied, which is likely to affect the differences in trait measurments between them.
